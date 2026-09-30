@@ -1,0 +1,102 @@
+url: ${APP_URL}
+name: Full cycle - customer orders, restaurant prepares, driver delivers, customer sees Delivered
+tags:
+  - business
+---
+# CUSTOMER APP (real UI): browse, cart, checkout.
+- runFlow: ../_shared/login.yaml
+- runFlow: ../_shared/open-qa-kitchen.yaml
+- tapOn:
+    id: add-QA Burger
+- extendedWaitUntil:
+    visible:
+      id: qty-QA Burger-value
+    timeout: 15000
+- tapOn:
+    id: cart-bar
+- extendedWaitUntil:
+    visible:
+      id: cart-checkout
+    timeout: 15000
+- tapOn:
+    id: cart-checkout
+- extendedWaitUntil:
+    visible:
+      id: checkout-place-order
+    timeout: 15000
+- tapOn:
+    id: checkout-place-order
+- extendedWaitUntil:
+    visible:
+      id: order-status
+      text: Confirmed
+    timeout: 20000
+
+# RESTAURANT (stand-in: no restaurant client exists yet, so the runner acts as
+# qa.restaurant through the real API).
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: restaurant/prepare
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: restaurant/ready
+# Customer app polls order detail every 10s.
+- extendedWaitUntil:
+    visible:
+      id: order-status
+      text: Ready for pickup
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: delivery-stage
+      text: Finding a driver
+    timeout: 30000
+
+# DISPATCH (manual today: no auto-dispatch) + DRIVER (stand-in: no driver client exists yet).
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: restaurant/dispatch
+- extendedWaitUntil:
+    visible:
+      id: delivery-stage
+      text: Driver assigned
+    timeout: 30000
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: driver/pickup
+- extendedWaitUntil:
+    visible:
+      id: delivery-stage
+      text: Picked up
+    timeout: 30000
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: driver/start
+- extendedWaitUntil:
+    visible:
+      id: delivery-stage
+      text: On the way
+    timeout: 30000
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: driver/complete
+
+# CUSTOMER APP: order and delivery reach Delivered; the confirmation notification is in Alerts.
+- extendedWaitUntil:
+    visible:
+      id: order-status
+      text: Delivered
+    timeout: 30000
+- assertVisible:
+    id: delivery-stage
+    text: Delivered
+- openLink: ${APP_URL}/notifications
+- extendedWaitUntil:
+    visible: '.*${output.control.orderId} has been confirmed\.'
+    timeout: 20000

@@ -1,0 +1,19 @@
+url: ${APP_URL}
+name: Ready order without a delivery shows the waiting-for-driver state
+tags:
+  - regression
+---
+- runFlow: ../_shared/login.yaml
+# Seed scenario S3: READY_FOR_PICKUP, no delivery created yet (by-order lookup returns 404).
+- openLink: ${APP_URL}/order/${AWAITING_ORDER_ID}
+- extendedWaitUntil:
+    visible:
+      id: order-status
+      text: Ready for pickup
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: delivery-stage
+      text: Finding a driver
+    timeout: 20000
+- assertVisible: '.*QA Pasta'

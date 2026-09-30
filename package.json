@@ -46,7 +46,11 @@
     "lint": "expo lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "e2e:smoke": "node e2e/scripts/run.mjs --suite smoke",
+    "e2e:regression": "node e2e/scripts/run.mjs --suite regression",
+    "e2e:business": "node e2e/scripts/run.mjs --suite business",
+    "e2e:all": "node e2e/scripts/run.mjs --suite all"
   },
   "private": true
 }
