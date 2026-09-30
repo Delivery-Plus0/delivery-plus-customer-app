@@ -100,9 +100,11 @@ export default function CartScreen() {
             <ThemedText type="default" themeColor="textSecondary">
               Subtotal · {count} {count === 1 ? 'item' : 'items'}
             </ThemedText>
-            <ThemedText type="heading">{formatMoney(cart.data.total)}</ThemedText>
+            <ThemedText type="heading" testID="cart-subtotal">
+              {formatMoney(cart.data.total)}
+            </ThemedText>
           </View>
-          <AppButton title="Go to checkout" onPress={() => router.push('/checkout')} />
+          <AppButton testID="cart-checkout" title="Go to checkout" onPress={() => router.push('/checkout')} />
         </View>
       }
     >
@@ -139,6 +141,7 @@ export default function CartScreen() {
               <ThemedText type="smallBold">{formatMoney(item.price * item.quantity)}</ThemedText>
             </View>
             <QuantityStepper
+              testID={`cart-qty-${item.name}`}
               quantity={item.quantity}
               itemName={item.name}
               onChange={(next) => changeQuantity(item.menuItemId, next)}

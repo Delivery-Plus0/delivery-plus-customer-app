@@ -57,11 +57,12 @@ export default function HomeScreen() {
             {greetingFor()}
             {name ? `, ${name}` : ''}
           </ThemedText>
-          <ThemedText type="subtitle" accessibilityRole="header">
+          <ThemedText type="subtitle" accessibilityRole="header" testID="home-title">
             What are you craving?
           </ThemedText>
         </View>
         <IconButton
+          testID="home-cart"
           icon="bag"
           accessibilityLabel="Cart"
           badgeCount={cartItemCount(cart)}
@@ -73,6 +74,8 @@ export default function HomeScreen() {
         <View style={styles.search}>
           <Icon name="search" size={IconSize.md} color={BrandColors.textMuted} />
           <TextInput
+            testID="home-search"
+            nativeID="home-search"
             value={search}
             onChangeText={setSearch}
             placeholder="Search restaurants"
@@ -93,6 +96,8 @@ export default function HomeScreen() {
             const selected = option.label === filter.label;
             return (
               <Pressable
+                testID={`filter-${option.label}`}
+                nativeID={`filter-${option.label}`}
                 key={option.label}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}

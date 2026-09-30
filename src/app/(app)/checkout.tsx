@@ -101,12 +101,14 @@ export default function CheckoutScreen() {
 
   const footer = failedOrderId ? (
     <AppButton
+      testID="checkout-view-order"
       title="View order status"
       variant="secondary"
       onPress={() => router.replace({ pathname: '/order/[id]', params: { id: failedOrderId } })}
     />
   ) : (
     <AppButton
+      testID="checkout-place-order"
       title={`Place order · ${formatMoney(cart.data?.total)}`}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
@@ -118,7 +120,7 @@ export default function CheckoutScreen() {
     <Screen footer={footer}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
-        {errorMessage ? <InlineAlert message={errorMessage} /> : null}
+        {errorMessage ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
 
         {restaurant.data ? (
           <Card style={styles.row}>

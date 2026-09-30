@@ -27,6 +27,7 @@ export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress
 
   return (
     <Pressable
+      testID={`restaurant-${restaurant.name}`} nativeID={`restaurant-${restaurant.name}`}
       accessibilityRole="button"
       accessibilityLabel={`${restaurant.name}, ${status.label}, ${restaurant.address}`}
       onPress={() => onPress(restaurant)}

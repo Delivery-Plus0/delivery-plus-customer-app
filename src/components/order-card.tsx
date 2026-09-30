@@ -23,6 +23,7 @@ export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
 
   return (
     <Card
+      testID={`order-card-${order.id}`}
       onPress={() => router.push({ pathname: '/order/[id]', params: { id: order.id } })}
       accessibilityLabel={`Order from ${restaurantName}, ${formatMoney(order.totalAmount)}`}
     >

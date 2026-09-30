@@ -8,13 +8,16 @@ type QuantityStepperProps = {
   onChange: (next: number) => void;
   itemName: string;
   disabled?: boolean;
+  /** Prefix for `<prefix>-decrease`, `<prefix>-value`, `<prefix>-increase` test ids. */
+  testID?: string;
 };
 
 /** −/qty/+ control. Going below 1 asks the caller to remove the line (quantity 0). */
-export function QuantityStepper({ quantity, onChange, itemName, disabled = false }: QuantityStepperProps) {
+export function QuantityStepper({ quantity, onChange, itemName, disabled = false, testID }: QuantityStepperProps) {
   return (
-    <View style={styles.row}>
+    <View style={styles.row} testID={testID} nativeID={testID}>
       <Pressable
+        testID={testID && `${testID}-decrease`} nativeID={testID && `${testID}-decrease`}
         accessibilityRole="button"
         accessibilityLabel={quantity <= 1 ? `Remove ${itemName}` : `Decrease ${itemName}`}
         disabled={disabled}
@@ -24,11 +27,12 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
       >
         <Icon name={quantity <= 1 ? 'trash' : 'minus'} size={IconSize.sm} color={BrandColors.primaryText} />
       </Pressable>
-      <Text style={styles.quantity} accessibilityLabel={`${quantity} in cart`}>
+      <Text style={styles.quantity} accessibilityLabel={`${quantity} in cart`} testID={testID && `${testID}-value`} nativeID={testID && `${testID}-value`}>
         {quantity}
       </Text>
       <Pressable
         accessibilityRole="button"
+        testID={testID && `${testID}-increase`} nativeID={testID && `${testID}-increase`}
         accessibilityLabel={`Increase ${itemName}`}
         disabled={disabled}
         hitSlop={6}

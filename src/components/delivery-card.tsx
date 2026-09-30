@@ -87,7 +87,7 @@ export function DeliveryCard({ delivery, isLoading, error, live, onRetry }: Deli
   const cancelled = delivery?.status === 'CANCELLED';
 
   return (
-    <Card>
+    <Card testID="delivery-card">
       <View style={styles.header} accessible accessibilityLabel={`Delivery: ${meta.label}. ${meta.description}`}>
         <View style={styles.iconWrap}>
           <Icon name={meta.icon} size={IconSize.md} color={BrandColors.primaryText} />
@@ -96,7 +96,9 @@ export function DeliveryCard({ delivery, isLoading, error, live, onRetry }: Deli
           <ThemedText type="caption" themeColor="textSecondary">
             DELIVERY
           </ThemedText>
-          <ThemedText type="defaultBold">{meta.label}</ThemedText>
+          <ThemedText type="defaultBold" testID="delivery-stage">
+            {meta.label}
+          </ThemedText>
         </View>
       </View>
       <ThemedText type="small" themeColor="textSecondary">

@@ -11,6 +11,7 @@ type IconButtonProps = {
   color?: string;
   disabled?: boolean;
   variant?: 'plain' | 'filled';
+  testID?: string;
 };
 
 export function IconButton({
@@ -21,9 +22,11 @@ export function IconButton({
   color = BrandColors.text,
   disabled = false,
   variant = 'filled',
+  testID,
 }: IconButtonProps) {
   return (
     <Pressable
+      testID={testID} nativeID={testID}
       accessibilityRole="button"
       accessibilityLabel={badgeCount > 0 ? `${accessibilityLabel}, ${badgeCount}` : accessibilityLabel}
       accessibilityState={{ disabled }}

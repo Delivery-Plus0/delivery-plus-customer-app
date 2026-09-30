@@ -115,6 +115,7 @@ const NotificationRow = memo(function NotificationRow({
 }) {
   return (
     <Pressable
+      testID={`notification-${item.id}`} nativeID={`notification-${item.id}`}
       accessibilityRole="button"
       accessibilityLabel={`${item.isRead ? '' : 'Unread. '}${item.title}. ${item.message}`}
       accessibilityHint={item.isRead ? undefined : 'Marks this notification as read'}

@@ -16,6 +16,8 @@ export function CartBar({ bottomInset = 0 }: { bottomInset?: number }) {
   return (
     <View style={[styles.wrap, { bottom: Spacing.three + bottomInset }]} pointerEvents="box-none">
       <Pressable
+        testID="cart-bar"
+        nativeID="cart-bar"
         accessibilityRole="button"
         accessibilityLabel={`View cart, ${count} ${count === 1 ? 'item' : 'items'}, ${formatMoney(cart.total)}`}
         onPress={() => router.push('/cart')}

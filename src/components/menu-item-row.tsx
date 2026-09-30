@@ -58,12 +58,14 @@ export const MenuItemRow = memo(function MenuItemRow({
         ) : null}
         {!item.available ? null : quantityInCart > 0 ? (
           <QuantityStepper
+            testID={`qty-${item.name}`}
             quantity={quantityInCart}
             itemName={item.name}
             onChange={(next) => onChangeQuantity(item, next)}
           />
         ) : (
           <Pressable
+            testID={`add-${item.name}`} nativeID={`add-${item.name}`}
             accessibilityRole="button"
             accessibilityLabel={`Add ${item.name} to cart`}
             accessibilityState={{ busy: pending, disabled: pending }}

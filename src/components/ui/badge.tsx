@@ -13,12 +13,13 @@ const toneColors: Record<BadgeTone, { background: string; text: string }> = {
   info: { background: BrandColors.infoSoft, text: BrandColors.info },
 };
 
-export function Badge({ label, tone = 'neutral' }: { label: string; tone?: BadgeTone }) {
+export function Badge({ label, tone = 'neutral', testID }: { label: string; tone?: BadgeTone; testID?: string }) {
   const colors = toneColors[tone];
 
   return (
     <View style={[styles.badge, { backgroundColor: colors.background }]}>
-      <Text style={[styles.label, { color: colors.text }]} numberOfLines={1}>
+      {/* The id sits on the text node so UI tests can match id + label together. */}
+      <Text style={[styles.label, { color: colors.text }]} numberOfLines={1} testID={testID} nativeID={testID}>
         {label}
       </Text>
     </View>

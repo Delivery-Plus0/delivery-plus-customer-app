@@ -60,6 +60,7 @@ export default function LoginScreen() {
       }
     >
       <FormTextInput
+        testID="login-email"
         label="Email"
         value={email}
         onChangeText={setEmail}
@@ -76,6 +77,7 @@ export default function LoginScreen() {
         onSubmitEditing={() => passwordRef.current?.focus()}
       />
       <FormTextInput
+        testID="login-password"
         ref={passwordRef}
         label="Password"
         value={password}
@@ -92,11 +94,11 @@ export default function LoginScreen() {
 
       {error ? (
         <View style={styles.alert}>
-          <InlineAlert message={error} />
+          <InlineAlert message={error} testID="login-error" />
         </View>
       ) : null}
 
-      <AppButton title="Sign in" onPress={() => void handleSubmit()} loading={isSubmitting} />
+      <AppButton testID="login-submit" title="Sign in" onPress={() => void handleSubmit()} loading={isSubmitting} />
     </AuthFormShell>
   );
 }

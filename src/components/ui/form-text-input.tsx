@@ -18,6 +18,7 @@ export function FormTextInput({ label, error, hint, style, onFocus, onBlur, ref,
       <Text style={styles.label}>{label}</Text>
       <TextInput
         {...props}
+        nativeID={props.nativeID ?? props.testID}
         ref={ref}
         accessibilityLabel={props.accessibilityLabel ?? label}
         accessibilityHint={error ?? hint}

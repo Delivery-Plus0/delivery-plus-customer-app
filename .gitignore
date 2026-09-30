@@ -48,3 +48,7 @@ example
 # generated native folders
 /ios
 /android
+
+# E2E build output, Maestro reports and screenshots
+e2e/.web-build/
+e2e/.artifacts/

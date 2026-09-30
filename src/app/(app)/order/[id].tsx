@@ -77,7 +77,7 @@ export default function OrderDetailScreen() {
     <Screen
       footer={
         canCancel ? (
-          <AppButton title="Cancel order" variant="danger" loading={cancelling} onPress={() => void handleCancel()} />
+          <AppButton testID="order-cancel" title="Cancel order" variant="danger" loading={cancelling} onPress={() => void handleCancel()} />
         ) : placed ? (
           <AppButton title="View all orders" variant="secondary" onPress={goToOrders} />
         ) : undefined
@@ -98,7 +98,7 @@ export default function OrderDetailScreen() {
           />
         }
       >
-        {placed && live ? <InlineAlert tone="success" message="Order placed! We'll keep this page updated." /> : null}
+        {placed && live ? <InlineAlert testID="order-placed" tone="success" message="Order placed! We'll keep this page updated." /> : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
 
         <Card>
@@ -111,7 +111,7 @@ export default function OrderDetailScreen() {
                 {formatDateTime(current.createdAt)}
               </ThemedText>
             </View>
-            <OrderStatusBadge status={current.status} />
+            <OrderStatusBadge status={current.status} testID="order-status" />
           </View>
           <View style={styles.timeline}>
             <OrderTimeline status={current.status} />

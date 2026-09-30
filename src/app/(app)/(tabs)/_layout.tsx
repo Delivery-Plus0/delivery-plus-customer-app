@@ -28,18 +28,19 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: BrandColors.background },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: tabIcon('home') }} />
-      <Tabs.Screen name="orders" options={{ title: 'Orders', tabBarIcon: tabIcon('orders') }} />
+      <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: tabIcon('home'), tabBarButtonTestID: 'tab-home' }} />
+      <Tabs.Screen name="orders" options={{ title: 'Orders', tabBarIcon: tabIcon('orders'), tabBarButtonTestID: 'tab-orders' }} />
       <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
           tabBarIcon: tabIcon('bell'),
+          tabBarButtonTestID: 'tab-alerts',
           tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: BrandColors.primary, color: BrandColors.onPrimary },
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tabIcon('person') }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tabIcon('person'), tabBarButtonTestID: 'tab-profile' }} />
     </Tabs>
   );
 }

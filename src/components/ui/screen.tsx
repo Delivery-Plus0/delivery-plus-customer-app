@@ -48,7 +48,7 @@ export function ScreenHeader({ title, subtitle, showBack = false, right }: Scree
     <View style={styles.header}>
       {showBack ? <IconButton icon="back" accessibilityLabel="Go back" onPress={goBack} /> : null}
       <View style={styles.headerText}>
-        <ThemedText type="subtitle" numberOfLines={1} accessibilityRole="header">
+        <ThemedText type="subtitle" numberOfLines={1} accessibilityRole="header" testID="screen-title">
           {title}
         </ThemedText>
         {subtitle ? (

@@ -19,9 +19,9 @@ export const orderStatusMeta: Record<OrderStatus, { label: string; description: 
   CANCELLED: { label: 'Cancelled', description: 'This order was cancelled.', tone: 'neutral' },
 };
 
-export function OrderStatusBadge({ status }: { status: OrderStatus }) {
+export function OrderStatusBadge({ status, testID }: { status: OrderStatus; testID?: string }) {
   const meta = orderStatusMeta[status] ?? { label: status, tone: 'neutral' as const };
-  return <Badge label={meta.label} tone={meta.tone} />;
+  return <Badge label={meta.label} tone={meta.tone} testID={testID} />;
 }
 
 /** Vertical progress through the happy-path lifecycle; collapses to a single row for failed/cancelled orders. */

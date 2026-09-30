@@ -13,14 +13,15 @@ type StateViewProps = {
   actionLabel?: string;
   onAction?: () => void;
   tone?: 'neutral' | 'danger';
+  testID?: string;
 };
 
 /** Centered empty / error placeholder used by every data-driven screen. */
-export function StateView({ icon, title, message, actionLabel, onAction, tone = 'neutral' }: StateViewProps) {
+export function StateView({ icon, title, message, actionLabel, onAction, tone = 'neutral', testID }: StateViewProps) {
   const danger = tone === 'danger';
 
   return (
-    <View style={styles.container} accessibilityRole="summary">
+    <View style={styles.container} accessibilityRole="summary" testID={testID} nativeID={testID}>
       <View style={[styles.iconWrap, danger && styles.iconWrapDanger]}>
         <Icon name={icon} size={28} color={danger ? BrandColors.danger : BrandColors.primaryText} />
       </View>
@@ -48,6 +49,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
 
   return (
     <StateView
+      testID="error-state"
       icon={offline ? 'offline' : 'error'}
       tone="danger"
       title={offline ? 'You appear to be offline' : 'Something went wrong'}

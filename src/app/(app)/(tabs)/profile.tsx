@@ -136,7 +136,7 @@ export default function ProfileScreen() {
               <ThemedText type="caption" themeColor="textSecondary" style={styles.meta}>
                 Signed in as {session?.user.role === 'CUSTOMER' ? 'a customer' : session?.user.role}
               </ThemedText>
-              <AppButton title="Sign out" icon="logout" variant="danger" onPress={() => void signOut()} />
+              <AppButton testID="profile-sign-out" title="Sign out" icon="logout" variant="danger" onPress={() => void signOut()} />
             </>
           ) : null}
         </ScrollView>

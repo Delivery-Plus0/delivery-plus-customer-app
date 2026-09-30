@@ -8,6 +8,7 @@ type InlineAlertProps = {
   message: string;
   tone?: 'danger' | 'info' | 'success';
   onDismiss?: () => void;
+  testID?: string;
 };
 
 const toneStyles = {
@@ -16,11 +17,12 @@ const toneStyles = {
   success: { background: BrandColors.successSoft, color: BrandColors.success, icon: 'check' },
 } as const;
 
-export function InlineAlert({ message, tone = 'danger', onDismiss }: InlineAlertProps) {
+export function InlineAlert({ message, tone = 'danger', onDismiss, testID }: InlineAlertProps) {
   const colors = toneStyles[tone];
 
   return (
     <View
+      testID={testID} nativeID={testID}
       style={[styles.alert, { backgroundColor: colors.background }]}
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"

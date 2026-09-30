@@ -15,6 +15,7 @@ type AppButtonProps = {
   icon?: IconName;
   fullWidth?: boolean;
   accessibilityHint?: string;
+  testID?: string;
 };
 
 const labelColor: Record<Variant, string> = {
@@ -34,12 +35,14 @@ export function AppButton({
   icon,
   fullWidth = true,
   accessibilityHint,
+  testID,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
   const color = labelColor[variant];
 
   return (
     <Pressable
+      testID={testID} nativeID={testID}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={accessibilityHint}
