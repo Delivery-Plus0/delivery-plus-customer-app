@@ -29,10 +29,13 @@ export function isDeliveryActive(delivery: Delivery | null | undefined): boolean
 export function useOrderDelivery(order: Order | undefined) {
   const enabled = canHaveDelivery(order);
   const orderActive = order ? !['DELIVERED', 'CANCELLED', 'FAILED'].includes(order.status) : false;
+  // Read the id up front: with `order!.id` inside the fetcher, the React Compiler memoizes the
+  // closure on `order.id` and evaluates it during render, crashing while the order is still loading.
+  const orderId = order?.id;
 
   return useResource<Delivery | null>(
-    enabled && order ? `delivery:order:${order.id}` : null,
-    () => fetchDeliveryForOrder(order!.id),
+    enabled && orderId ? `delivery:order:${orderId}` : null,
+    () => fetchDeliveryForOrder(orderId as string),
     {
       staleTimeMs: 3_000,
       pollIntervalMs: (delivery) => (orderActive && isDeliveryActive(delivery) ? ACTIVE_DELIVERY_POLL_MS : 0),

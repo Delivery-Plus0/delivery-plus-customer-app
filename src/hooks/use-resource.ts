@@ -15,6 +15,19 @@ type UseResourceOptions<T> = {
   keepPreviousData?: boolean;
 };
 
+/**
+ * `undefined` means "not loaded"; `null` is a real value (e.g. "no delivery yet"), so this must
+ * not use `??`, which would treat a loaded `null` as missing and leave the screen loading forever.
+ */
+export function resolveResourceData<T>(entry: ResourceEntry<T>, keepPreviousData: boolean, previousData: T | undefined) {
+  if (entry.data !== undefined) return entry.data;
+  return keepPreviousData && entry.error === undefined ? previousData : undefined;
+}
+
+export function isResourceLoading<T>(key: string | null, entry: ResourceEntry<T>, data: T | undefined): boolean {
+  return key !== null && data === undefined && (entry.isFetching || entry.error === undefined);
+}
+
 const noopUnsubscribe = () => {};
 const idleEntry: ResourceEntry<never> = getResource('__idle__');
 
@@ -75,14 +88,13 @@ export function useResource<T>(key: string | null, fetcher: () => Promise<T>, op
     setPreviousData(entry.data);
   }
 
-  const data = entry.data ?? (keepPreviousData && entry.error === undefined ? previousData : undefined);
-  const hasData = data !== undefined;
+  const data = resolveResourceData(entry, keepPreviousData, previousData);
 
   return {
     data,
     error: entry.error,
     /** First load with nothing cached yet — show a skeleton. */
-    isLoading: key !== null && !hasData && (entry.isFetching || entry.error === undefined),
+    isLoading: isResourceLoading(key, entry, data),
     isFetching: entry.isFetching,
     refreshing,
     refresh,
