@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
+import { DeliveryCard } from '@/components/delivery-card';
 import { OrderStatusBadge, OrderTimeline } from '@/components/order-status';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
@@ -13,6 +14,7 @@ import { ErrorState } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
 import { CUSTOMER_CANCELLABLE_STATUSES, isActiveOrder } from '@/services/orders';
 import { useRestaurant } from '@/state/catalog';
+import { canHaveDelivery, isDeliveryActive, useOrderDelivery } from '@/state/deliveries';
 import { cancelMyOrder, useOrder } from '@/state/orders';
 import { confirm } from '@/utils/confirm';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
@@ -21,6 +23,7 @@ export default function OrderDetailScreen() {
   const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
   const order = useOrder(id);
   const restaurant = useRestaurant(order.data?.restaurantId);
+  const delivery = useOrderDelivery(order.data);
   const [cancelling, setCancelling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -86,7 +89,10 @@ export default function OrderDetailScreen() {
         refreshControl={
           <RefreshControl
             refreshing={order.refreshing}
-            onRefresh={() => void order.refresh()}
+            onRefresh={() => {
+              void order.refresh();
+              void delivery.refresh();
+            }}
             tintColor={BrandColors.primary}
             colors={[BrandColors.primary]}
           />
@@ -116,6 +122,16 @@ export default function OrderDetailScreen() {
             </ThemedText>
           ) : null}
         </Card>
+
+        {canHaveDelivery(current) && !(delivery.data === null && !live) ? (
+          <DeliveryCard
+            delivery={delivery.data}
+            isLoading={delivery.isLoading}
+            error={delivery.error}
+            live={live && isDeliveryActive(delivery.data)}
+            onRetry={() => void delivery.refresh()}
+          />
+        ) : null}
 
         <Card>
           <ThemedText type="heading">Items</ThemedText>
