@@ -55,13 +55,14 @@ Successful auth response:
 | POST | `/api/payments` | Bearer JWT | create payment |
 | POST | `/api/payments/:id/process` | Bearer JWT | simulate processing |
 | GET | `/api/payments/:id` | Bearer JWT | payment detail |
-| GET | `/api/deliveries/:id` | Bearer JWT | delivery detail |
-| GET | `/api/tracking/delivery/:id` | Bearer JWT | tracking detail for a delivery |
+| GET | `/api/deliveries/by-order/:orderId` | Bearer JWT | delivery for one of the requester's orders; 404 = no delivery yet (or no such order), 403 = not your order |
+| GET | `/api/deliveries/:id` | Bearer JWT | delivery detail (order owner, its restaurant owner, the assigned driver, or admin) |
+| GET | `/api/tracking/delivery/:id` | Bearer JWT | delivery status + driver's last location (same ownership rule; location expires after 300s) |
+| GET | `/api/tracking/driver/:userId` | Bearer JWT | **not for customers**: the driver themself or admin only |
 
-**Gap — delivery tracking is not reachable from the customer app yet.** Both delivery routes take a
-*delivery* id, but `Order` has no `deliveryId` and there is no public "delivery by order" lookup, so the
-app cannot find the delivery for an order. Needs a backend route (e.g. `GET /api/deliveries/by-order/:orderId`)
-or a `deliveryId` on the order payload before tracking UI can be built.
+Delivery shape: `{ id, orderId, driverId, status: CREATED | DRIVER_ASSIGNED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED, createdAt, updatedAt }`. Deliveries only exist from `READY_FOR_PICKUP` onward and are created manually by an owner/admin (no auto-dispatch yet). The order detail screen polls `by-order` every 10s while active.
+
+A declined payment ends the order in `FAILED` (not `CANCELLED`); `POST /api/payments/:id/process` returns the `FAILED` payment with 201.
 
 ## Notifications and profile
 

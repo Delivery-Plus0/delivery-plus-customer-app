@@ -82,9 +82,10 @@ Backend usage:
 
 ## Phase 5 — delivery and tracking
 
-Status: order-status timeline implemented (polls every 10s while an order is active and on screen).
-Driver/delivery tracking is **blocked on the backend**: there is no public way to get a delivery id
-from an order (see 03-api-contract.md).
+Status: order-status timeline and a delivery status card are implemented, both polling every 10s
+while active and on screen (delivery via `GET /api/deliveries/by-order/:orderId`, ownership-checked).
+Live map / WebSocket tracking is Phase 5 in `planning.md`; it needs a driver client to produce
+locations and published delivery events first.
 
 Goal: show post-order status in an understandable customer experience.
 
@@ -123,6 +124,8 @@ Backend usage:
 
 ## Priority order for future work
 
-1. backend: expose delivery-by-order lookup, then build the tracking panel
+See `planning.md` (roadmap v2) for the dependency-ordered plan.
+
+1. ~~backend: expose delivery-by-order lookup~~ (done in Phase 0); live tracking panel is Phase 5
 2. avatar upload (`POST /api/users/me/avatar/image-upload-url` + `/confirm`)
 3. owner/driver journeys as separate apps
