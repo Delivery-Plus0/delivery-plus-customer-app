@@ -1,319 +1,246 @@
 # Delivery Plus — Platform & Customer App Planning
 
-_Last updated: 2026-09-30, after Phase 0._
+_Last updated: 2026-09-30, after the hardening phase and the E2E automation foundation._
 
-This plan covers the customer app (`delivery-plus-customer-app`) and the backend it depends on (`delivery-plus`). It was rebuilt from the code, not from earlier plans. Where docs and code disagreed, the code won. Every "done" below was verified; §11 lists the checks.
+This plan covers the customer app (`delivery-plus-customer-app`) and the backend (`delivery-plus`). It is rebuilt from the code and from what the automated runs actually showed. **Definition of done:** a change is done only when the right levels of verification pass: unit → integration (live API) → contract (OpenAPI) → UI/E2E → business flow. Each "done" below names the levels it has.
 
 ---
 
 ## 1. Summary
 
-- **Phase 0 is complete and verified.**
-  - The customer app is under git with CI.
-  - The failed-payment race is fixed.
-  - Delivery and tracking reads are ownership-checked.
-  - Customers can resolve an order's delivery.
-  - Order detail shows delivery progress by polling.
-- **The biggest remaining gap is the missing operator clients, not the customer app.** There is no restaurant dashboard, driver app, or admin UI. Nothing dispatches deliveries automatically. So a real customer order stops at `CONFIRMED` unless someone drives the rest through the API. Today only scripts do that.
-- **Kafka is still "at-least-once with in-memory safeguards".** Delivery events are never published, and there's no DLQ, outbox, or durable dedup. Notifications and real-time tracking both depend on fixing this.
-- **The review found five more authorization/correctness issues** (§6.1). They're small, and they block production.
-- **Roadmap changes** (§8): a hardening phase first, then Kafka reliability, then **operator clients + auto-dispatch** (new), then notifications, then real-time tracking. Tracking moved later because it needs a driver client to produce locations. Product features and platform work follow.
+- **Hardening is done and verified.**
+  - Delivery dispatch is restricted to the order's restaurant owner (or admin).
+  - Driver profiles are no longer public.
+  - Notification mark-read is owner-scoped.
+  - The cart rate limit is actually enforced.
+  - Customers can no longer refund their own payments.
+- **UI automation exists and runs:** Maestro drives the real customer app (web build, headless Chromium) against an isolated, deterministically seeded backend. **9/9 flows pass from a fresh environment**, including a full order → restaurant → dispatch → driver → delivered → notification cycle.
+- **E2E found five real bugs that no other layer caught:**
+  1. The order detail screen crashed on web (React Compiler + a `!` assertion).
+  2. The delivery card never left its loading state.
+  3. Duplicate "Order Confirmed" notifications (racing status writers).
+  4. A fresh Kafka crashed driver-service on boot.
+  5. 10% of UI checkouts would be randomly declined.
+
+  All are fixed and covered by tests.
+- **The main blocker is unchanged: only the customer app exists.** The restaurant and driver steps in the business flow are API stand-ins, and nothing dispatches deliveries automatically.
+- **Kafka review:** events are keyed by a random `correlationId`, so there is no per-order ordering beyond today's single-partition topics. Delivery events are still never published, and there's no durable dedup, DLQ, or outbox. This has to be fixed before real-time tracking.
 
 ---
 
-## 2. Client ecosystem (verified)
+## 2. Completed (verified)
 
-Only **one client exists**: the customer app. The backend README says it is backend-only by design. Restaurant, driver, and admin workflows exist only as API routes, exercised today by `scripts/seed.ts`, `scripts/seed-demo.ts`, `scripts/e2e.ts`, and Swagger UI.
-
-| Client | Exists? | Responsibilities | Services consumed | Workflows complete | Partial / missing | Kafka | Redis | S3 | Mocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Customer app** (Expo 57) | ✅ | Sign up/in, browse, cart, checkout, orders, delivery status, notifications, profile | auth, users, restaurants, menus, cart, orders, payments, deliveries, notifications | Auth, browse/search, cart, checkout (incl. declines), order history/detail/cancel, delivery status (polling), notifications list/read, profile edit | Avatar upload (backend ready, no UI); live map; push | Indirect (notifications and order status come from events) | Indirect (cart, rate limits) | Displays images; **no uploads** | Nothing |
-| **Restaurant dashboard** | ❌ | Accept/prepare orders, mark ready, dispatch, menu and image management, open/close | restaurants, menus, orders, deliveries | — | Everything; API only | Would consume `order.*` | — | Restaurant and menu image uploads | — |
-| **Driver app** | ❌ | Go online/offline, accept delivery, pickup/start/complete, stream location | drivers, deliveries, tracking | — | Everything; API only | — | Location in Redis | — | — |
-| **Admin / ops** | ❌ | Force transitions, suspend restaurants/drivers, support | all (ADMIN role) | — | No UI; Swagger and Kafka UI (dev) only | — | — | — | — |
-
-Missing backend contracts for those clients: an order feed for restaurants (listing exists: `GET /orders/restaurant/:id`, but no push), a driver "my current delivery" endpoint, auto-dispatch, and driver job offers/acceptance (assignment is automatic, with no accept/decline).
-
----
-
-## 3. Current status — before vs. now
-
-"Before" is the start of the 2026-09-30 work. "Now" is after the UI pass and Phase 0.
-
-| Area | Before | Now |
+| Item | What changed | Verified by |
 | --- | --- | --- |
-| Version control / CI | App not under git; no CI | Git repo (`main`, 3 commits). GitHub Actions: typecheck, lint (0 warnings), vitest, Expo web export. Verified on a fresh clone. |
-| Navigation / layout | Stack only, text links, no safe areas | Tabs (Home, Orders, Alerts, Profile) plus stack screens, safe areas, back buttons |
-| Design system | Ad-hoc hex values; dark-mode text bug | Semantic tokens, type scale, shared components, light-only by design (`BRANDING.md`) |
-| Data layer | Refetch on every mount, spinners | Shared stale-while-revalidate cache, refresh on focus, pull-to-refresh, skeletons, cache wiped on account change |
-| Networking | No timeout; validation errors lost | 15s timeout, offline errors, NestJS messages shown, session cleared only on authenticated 401 |
-| Catalog | Horizontal list, no images | Server search, "Open now", images, grouped menus, sold-out items |
-| Cart / checkout | Fake $4.99 fee | Server totals, optimistic steppers, restaurant-conflict prompt, idempotent checkout |
-| Payment decline | **500 error; order ended `CANCELLED`** | **Clear "payment failed"; order ends `FAILED`** (P0-2) |
-| Orders | Raw restaurant UUIDs | In progress / past sections, names, timeline, 10s polling, customer cancel |
-| Delivery | Not reachable (no order→delivery lookup) | **Delivery card on order detail**: finding a driver → assigned → picked up → on the way → delivered/cancelled (P0-4) |
-| Notifications / profile | Hardcoded mocks | Real API (read / read-all / infinite scroll); profile read and edit |
-| Tests | 12 | 36 unit tests (app) |
-| Demo data | Empty dev DB | `npm run seed:demo`: 6 restaurants, 29 dishes, images, and a customer with orders in every state, including a real `FAILED` |
-
-Still not done in the app: avatar upload UI, push notifications, live map, dark mode (needs a light wordmark), accessibility decision on brand-red buttons (white on `#FF0000` is 4.0:1).
-
----
-
-## 4. Phase 0 — completed
-
-| ID | Item | What changed (code) | Verified by |
-| --- | --- | --- | --- |
-| P0-1 | Customer app git + CI | `git init` on `main`. `.gitignore` excludes env files, `dist/`, `.expo/`, generated stubs. `.gitattributes` keeps LF. `.env.example`. Scripts: `typecheck`, `lint` (`--max-warnings=0`), `test`, `export:web`. `.github/workflows/ci.yml` (Node 22). `src/types/expo.d.ts` makes a fresh clone typecheck (the Expo-generated `expo-env.d.ts` is git-ignored). | All 4 CI steps pass on a **fresh clone** (Node 20.20.2 locally; CI pins 22; RN supports both). Not yet run on GitHub — no remote configured. |
-| P0-2 | Failed-payment race | **Root cause:** order-service's `payment.failed` consumer wrote `CANCELLED` while payment-service's HTTP sync wrote `FAILED`, so the second writer got a 409 and `/process` returned 500. **Fix:** one terminal state, `FAILED`, in both paths. Payment-service owns the transition; the Kafka consumer (`syncFromPaymentEvent`) is a convergence path that skips same-status, stale, and late events instead of failing. A decline after the customer already cancelled is treated as synced (order stays `CANCELLED`). A *completed* payment on a cancelled order still errors, because it needs a refund. The order client maps 409 → `ConflictError`. **Events:** added `order.payment_pending` and `order.failed`; these transitions were previously mislabeled `order.created`. | 7 new order-service tests and 6 new payment-service tests (success, decline, duplicate event, late event after cancel, stale event, unknown order, non-terminal conflict, completed-on-cancelled). Live: declined payment → HTTP 201, order `FAILED` in `order_service` DB, payment `FAILED` with both side effects marked done. Repeat process → idempotent. Cancel-then-decline → 201, order stays `CANCELLED`. |
-| P0-3 | Delivery / tracking authorization | `GET /deliveries/:id` now follows the ownership chain JWT → order → delivery. Customers and restaurant owners are checked **by order-service using the requester's own token** (one source of truth for order access). Drivers must be the assigned driver. Admin can read anything. `GET /tracking/driver/:userId` was **fully public**; it now requires JWT with role DRIVER (own location only) or ADMIN. The tracking client maps 403 correctly (was 400). | Unit tests for every role and case, plus controller guard-metadata tests. Live (24 checks): 401 without token on all three routes; customer's own → 200; other customer → 403; restaurant owner of that order → 200; assigned driver → 200; unassigned driver → 403; customer reading a raw driver location → 403; driver's own → 200; other driver's → 403; customer tracking own delivery → 200 with location; other customer → 403. |
-| P0-4 | Order → delivery lookup | New `GET /api/deliveries/by-order/:orderId` using the existing unique `deliveries.orderId` index. Order access is checked **before** the delivery lookup, so another customer's order never reveals whether a delivery exists. 404 "No delivery has been created for order … yet" vs 404 "Order … not found". Returns the same `Delivery` shape as `GET /:id` (`id, orderId, driverId, status, timestamps`). Public OpenAPI contract regenerated and validated. **Considered and rejected:** storing `deliveryId` on the order, which would need a cross-service write, a migration, and a new event for no benefit. | Unit tests (owner, not found, not owner, not yet created, driver). Live: owner → 200 `IN_TRANSIT`; other customer → 403; no delivery yet → 404; unknown order → 404. |
-| P0-5 | Delivery card (polling) | `services/deliveries.ts`, `state/deliveries.ts` (`useOrderDelivery` hook, the seam for Phase 5 real-time), `components/delivery-card.tsx`, wired into order detail. Fetches only once the order can have a delivery (`READY_FOR_PICKUP` onward). Polls every 10s while active and focused; stops at `DELIVERED`/`CANCELLED`. Has skeleton, inline retry error, and accessibility labels. | 5 new app tests. Typecheck, lint, and web export pass. The data path was verified live through the gateway. **Not yet inspected visually on a device.** |
-
-Also changed: `scripts/seed-demo.ts` no longer tolerates the old 500 and now seeds a real `FAILED` scenario. Backend docs and OpenAPI were updated.
+| **P0-1** App git + CI | Repo on `main`; CI runs typecheck, lint (0 warnings), vitest, web export | Fresh-clone run of all CI steps. Not yet run on GitHub (no remote) |
+| **P0-2** Failed-payment race | One terminal state (`FAILED`); tolerant payment-event consumer; typed 409 handling | Unit (order + payment); live API; DB state; **UI: declined order shows Failed** |
+| **P0-3** Delivery/tracking reads | JWT → order ownership → delivery; driver location self/admin only | Unit; live API (24 checks); **UI: another customer's order is refused** |
+| **P0-4** Order → delivery lookup | `GET /api/deliveries/by-order/:orderId` | Unit; live API; OpenAPI; **UI: "Finding a driver" and delivery stages** |
+| **P0-5** Delivery card (polling) | Order detail shows delivery progress, 10s polling | **UI: waiting state and every stage in the business flow** |
+| **H1** Dispatch ownership | Create/assign/cancel: admin, or the owner of the order's restaurant (checked by order-service with the owner's token) | Unit (allowed + forbidden); live API (6 checks) |
+| **H2** Driver profiles | `GET /drivers/available`: JWT + ADMIN (services use system tokens); `GET /drivers/:id`: driver themself or admin. tracking-service gained a system-token minter | Unit + guard metadata; live API (7 checks, incl. tracking still resolving drivers) |
+| **H3** Cart rate limit | `RateLimitGuard` reads the handler limit, then the controller limit (the cart's class-level 30/min was ignored) | Unit regression; live: first 429 at request 31 |
+| **H4** Notification ownership | Mark-read scoped to the owner, 404 otherwise; UUID validation (was a 500) | Unit; live API (3 checks) |
+| **Refund authorization** (audit) | Refunds are admin/support-only; customers could refund their own completed payment at any time, even after delivery | Unit; live API |
+| **Order status compare-and-set** (E2E finding) | `UPDATE … WHERE status = expected`; only the winning writer publishes. Fixed duplicate `order.confirmed` → duplicate notifications | Unit (concurrent writers); live: fresh env shows 2 notifications, 0 duplicates |
+| **Kafka topic bootstrap** (E2E finding) | Consumers create their topic before subscribing. A fresh cluster used to crash driver-service (`delivery.events` did not exist yet) | Unit; live: cold start, 0 restarts |
+| **Order detail crash** (E2E finding) | React Compiler evaluated `order!.id` during render while the order was loading → blank page | UI (every order flow); code comment |
+| **Delivery card stuck loading** (E2E finding) | `useResource` treated a loaded `null` ("no delivery yet") as missing | Unit regression; UI |
+| **E2E environment** | `docker-compose.e2e.yml` (project `delivery-plus-e2e`, gateway :3100, storage :9100, own volumes, payments always succeed), `npm run e2e:env:up/down/reset` | Cold start from empty volumes; seed; full UI run |
+| **Deterministic seed** | `npm run seed:e2e`: 4 QA accounts, QA Kitchen / QA Night Cafe, scenarios S1–S4, id manifest; refuses non-localhost targets | Fresh env, 3 runs |
+| **Maestro suites + runner + CI** | 9 flows, runner with control server, PR smoke / nightly full workflow | Local from-scratch run 9/9. GitHub run pending (§4) |
+| **Shared seed helpers** | `scripts/lib/gateway-seed.ts` used by `seed-demo` and `seed-e2e` | Both seeds run live (typecheck + execution) |
 
 ---
 
-## 5. Business flows
+## 3. Clients and what they use (verified in the repositories)
 
-### 5.1 Customer order flow (as implemented)
-
-| # | Step | Source → destination | Protocol | Data owner / storage | Events | Authorization boundary | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Register / login | App → Gateway → auth-service (→ user-service to create the profile) | HTTP; internal HMAC for auth→user | auth DB, user DB (Postgres) | — | Public, 5/min/IP rate limit | ✅ |
-| 2 | Browse restaurants / menu | App → restaurant-, menu-service | HTTP | Postgres + Redis cache | — | Public reads | ✅ |
-| 3 | Cart | App → cart-service (→ menu-service validates item) | HTTP | **Redis** | — | JWT (per-user cart) | ✅ (rate limit not enforced, §6.1) |
-| 4 | Create order | App → order-service (→ cart, restaurant OPEN check); clears cart | HTTP + `Idempotency-Key` | order DB | `order.created` | JWT customer, 5/min/user | ✅ |
-| 5 | Create payment | App → payment-service (→ order-service with the user's token) | HTTP | payment DB | `payment.created` → order `PAYMENT_PENDING` (HTTP sync + consumer) | JWT, owner of order | ✅ |
-| 6 | Process payment | App → payment-service | HTTP | payment DB | `payment.completed`/`failed`; order `CONFIRMED`/`FAILED`; `order.confirmed` → notification | JWT, owner of payment | ✅ (fixed in P0-2) |
-| 7 | Kitchen progression | **Restaurant owner** → order-service `PREPARING`, `READY_FOR_PICKUP` | HTTP | order DB | `order.preparing`, `order.ready_for_pickup` (**no consumers**) | JWT owner + restaurant ownership | ⚠️ API only, **no client** |
-| 8 | Create delivery | **Owner/admin** → delivery-service | HTTP | delivery DB | none | Dispatch role (**no restaurant-ownership check**, §6.1) | ⚠️ Manual, **no auto-dispatch** |
-| 9 | Assign driver | Owner/admin → delivery-service → driver-service (most recently updated AVAILABLE) → order `DRIVER_ASSIGNED` | HTTP (system token) | delivery + driver DBs | **delivery events not published** | Dispatch role | ⚠️ Manual |
-| 10 | Pickup → in transit → delivered | **Driver** → delivery-service → order `PICKED_UP`/`DELIVERED`, driver AVAILABLE | HTTP | delivery, order, driver DBs | not published | Assigned driver | ⚠️ API only, **no client** |
-| 11 | Customer delivery status | App → delivery-service `by-order` (→ order-service with the user's token) | HTTP polling (10s) | delivery DB | — | JWT → order → delivery | ✅ (P0-4/5) |
-| 12 | Customer tracking | App → tracking-service → delivery-service (user token) + driver-service + Redis | HTTP | Redis (last location, 300s TTL) | — | JWT → delivery ownership | ✅ API (P0-3); **not used by the app yet** |
-| 13 | Notifications | notification-service consumes `order.confirmed`; App lists/marks read | Kafka + HTTP | notification DB | Only `ORDER_CONFIRMED` created | JWT (mark-read has no owner check, §6.1) | ⚠️ Partial |
-
-**Where the chain breaks:** steps 7–10 have no client and step 8 is not automated. In a real deployment an order stops at `CONFIRMED`; seed/e2e scripts only complete it by acting as owner and driver. Step 13 only ever produces "Order Confirmed".
-
-### 5.2 Media / profile flow
-
-| Step | Source → destination | Protocol | Storage | Authorization |
+| Client | Exists | Services used | Complete workflows | Missing |
 | --- | --- | --- | --- | --- |
-| Request upload | App → user-service `POST /users/me/avatar/image-upload-url` | HTTP | — | JWT; key prefix bound to `users/<ownId>/avatar/` |
-| Upload | App → S3-compatible store (presigned POST) | HTTPS direct | `pending/` (expires after 1 day) | Policy enforces content-type, size range, key |
-| Confirm | App → user-service `…/avatar/confirm` | HTTP | Byte-verified, copied to a content-addressed key; `avatarUrl` saved in user DB | JWT; key must match the requester's prefix |
-| Display | App → public object URL | HTTPS | Public read except `pending/` | None (public) |
-
-Restaurant cover/logo and menu-item images use the **same** shared `S3StorageService`, with restaurant-ownership checks on both upload and confirm. **The app displays images but has no upload UI.** Gaps: replaced images are never deleted (orphans), and dev URLs are `localhost:9000`, which Android emulators and devices can't reach.
-
-### 5.3 Delivery / tracking flow
-
-| Step | Today | Target (Phase 5) |
-| --- | --- | --- |
-| Location source | Seed script posts `POST /tracking/location` (DRIVER role). **No driver client.** | Driver app sends every 3–5s while `PICKED_UP`/`IN_TRANSIT` |
-| Storage | tracking-service → Redis, last location only, 300s TTL | + short trail per delivery, ETA |
-| Fan-out | none | Redis Pub/Sub or Streams → realtime service |
-| Status changes | HTTP only; `delivery.events` never published | `delivery.*` on Kafka → realtime service |
-| Transport to app | App polls `by-order` every 10s | WebSocket through the gateway (`ws: true` not enabled today) |
-| Authorization | JWT → order → delivery (P0-3) | Same check on socket subscribe |
-| App seam | `useOrderDelivery` (polling) | Same hook backed by a socket; polling as fallback |
+| **Customer app** (Expo 57; web build under E2E) | ✅ | auth, users, restaurants, menus, cart, orders, payments, deliveries, notifications | sign in, browse/search, cart, checkout, order status + delivery polling, cancel, notifications, profile | avatar upload UI, push, live map, native (Android/iOS) E2E |
+| **Restaurant dashboard** | ❌ | — | — | whole client. Contract exists: owner order list, status transitions, dispatch, menu/images |
+| **Driver app** | ❌ | — | — | whole client. **Missing contract: "my current delivery"** (drivers cannot discover their assignment) |
+| **Admin / ops** | ❌ | Swagger, Kafka UI (dev) | — | whole client |
 
 ---
 
-## 6. Open issues found in the Phase 0 review
+## 4. Current blockers (real, verified)
 
-### 6.1 Authorization / correctness (small, production-blocking)
-
-| ID | Issue | Evidence | Fix |
+| # | Blocker | Blocks | Owner |
 | --- | --- | --- | --- |
-| H1 | **Any restaurant owner can create/assign/cancel deliveries for any order** | `deliveries.service.ts` checks only that the role is in `DISPATCH_ROLES` | Check restaurant ownership of the order (via order-service with the requester's token, as P0-3 does) |
-| H2 | **Driver profiles are public**: `GET /api/drivers/available` and `/api/drivers/:id` (userId, plate, status) | `public-openapi.ts` marks them `auth: false` | Internal-only for `available` (delivery-service uses it); JWT and admin/self for `:id` |
-| H3 | **Cart rate limit never enforced** | `@RateLimit` is on the cart controller *class*, but `RateLimitGuard` reads handler metadata only | Use `getAllAndOverride([handler, class])` in the guard |
-| H4 | Mark-notification-read has no ownership check | `markAsRead(id)` ignores the user | Scope the update by `userId` |
-| H5 | A completed payment on an order the customer cancelled while paying | Now surfaces as a 409 (no longer hidden) | Automatic refund or a compensation flow |
-
-### 6.2 Reliability / architecture
-
-| ID | Issue | Evidence |
-| --- | --- | --- |
-| K1 | `delivery.events` never published | `publishEvent` exists; lifecycle methods don't call it. driver-service and order-service consumers for them never fire. |
-| K2 | Consumer dedup is an in-memory `Set`; no DLQ; exhausted messages are committed | `KafkaConsumerService`; `DurableEventIdempotencyService` is built but unused |
-| K3 | Order and delivery events use random `uuidv4()` IDs | Duplicates can't be deduplicated (payment events are deterministic) |
-| K4 | No transactional outbox | order-service publishes after commit; a crash in between loses the event |
-| K5 | Notification handlers for payment/delivery are empty; payloads lack `customerId` | `notifications.service.ts` |
-| K6 | No auto-dispatch: delivery-service consumes no events | Deliveries only via manual API calls |
-| O1 | No timeouts, retries, or circuit breakers on inter-service `fetch` | No `AbortSignal`/`signal` anywhere in service clients |
-| O2 | Correlation IDs not propagated | Middleware exists; only auth→user forwards the header; Kafka events get fresh IDs |
-| O3 | No graceful shutdown hooks | No `enableShutdownHooks` in any service |
-| O4 | Redis has no persistence volume; single Kafka broker | Compose files |
-| M1 | Replaced/orphaned media objects are never deleted | Only a `pending/` lifecycle rule |
-| M2 | Dev media URLs unreachable from Android emulator/devices | `AWS_PUBLIC_BASE_URL=http://localhost:9000/...` |
-| E1 | Email verification tokens are never emailed | auth-service; flag off by default |
+| B1 | **No restaurant client** | Real kitchen workflow; restaurant UI E2E | New client |
+| B2 | **No driver client**, and no "current delivery" endpoint | Real delivery workflow; driver UI E2E; real location data for tracking | New client + delivery-service |
+| B3 | **No auto-dispatch** (delivery-service consumes no events) | Orders progressing without a person calling the API | delivery-service |
+| B4 | **Delivery events never published** | Notifications beyond "confirmed"; auto-dispatch triggers; real-time tracking | delivery-service |
+| B5 | **E2E CI cannot run yet:** the backend changes (E2E env, `seed:e2e`, hardening) are uncommitted, and the app repo has no remote | Automated E2E in CI | Commit/PR the backend changes; add the app remote |
+| B6 | Android/iOS E2E not set up (needs a development build + emulator; no Android SDK on this machine) | Native UI regression coverage | Platform |
 
 ---
 
-## 7. Remaining work per phase (reviewed against the code)
+## 5. Current sprint (next)
 
-The previous plan had Phases 1–5. Here is what changed:
-
-| Previous phase | Verdict |
-| --- | --- |
-| Phase 1 — Kafka reliability | Still valid; **all steps still open**. Moved to Phase 2. "Publish delivery events" goes first, since it unblocks notifications and tracking. |
-| Phase 2 — Real-time tracking | **Moved later (Phase 5).** Its prerequisites were only partly true: B2/S1/S2 are done, but it also needs a **driver client** to produce locations (missing from the old plan) and published delivery events. |
-| Phase 3 — Notifications | Still valid (now Phase 4). Depends on Kafka payload changes (K5) and delivery events (K1). |
-| Phase 4 — Product features | Split: app-only items (avatar upload, reorder) can be done any time; backend-dependent items stay later (now Phase 6). |
-| Phase 5 — Quality / platform | **Partly done** (app git + CI). The rest is expanded into Phase 7 with the verified gaps from §9. |
-| _(missing)_ | **Hardening** (§6.1), now Phase 1. |
-| _(missing)_ | **Operator clients + auto-dispatch**, now Phase 3. Without them the business flow can't run outside scripts. |
+1. **Land the work:** open a backend PR (hardening, CAS, Kafka topic bootstrap, E2E env, `seed:e2e`); push the app repo; run `e2e.yml` on GitHub and fix any Linux-only differences.
+2. **Kafka reliability core** (unblocks B3/B4): publish delivery events; key every event by `orderId`; deterministic event ids for order/delivery; wire durable idempotency + Redis persistence; dead-letter topic.
+3. **Dispatch + driver contracts:** auto-dispatch consumer (`order.ready_for_pickup` → create + assign); `GET /drivers/me/delivery`.
+4. **Paid-then-cancelled compensation** (refund policy), now that refunds are admin-only.
 
 ---
 
-## 8. Roadmap v2 (dependency-driven)
+## 6. Phase roadmap (recalculated)
 
 ```mermaid
 flowchart LR
-    P0[Phase 0 ✅ Foundation] --> P1[Phase 1 Hardening]
-    P0 --> P2[Phase 2 Kafka reliability]
-    P1 --> P3[Phase 3 Operator clients + auto-dispatch]
-    P2 --> P3
+    P0[Phase 0 ✅] --> P1[Phase 1 Hardening ✅]
+    P1 --> P2[Phase 2 Kafka reliability]
+    P2 --> P3[Phase 3 Operator clients + auto-dispatch]
     P2 --> P4[Phase 4 Notifications + push]
     P3 --> P5[Phase 5 Real-time tracking]
     P2 --> P5
-    P4 --> P6[Phase 6 Product features]
-    P5 --> P6
-    P7[Phase 7 Production readiness — continuous] -.-> P6
+    P3 --> P6[Phase 6 Product features]
+    E[E2E automation — continuous, every client] -.-> P3
+    E -.-> P5
+    R[Phase 7 Production readiness — continuous] -.-> P6
 ```
 
-### Phase 1 — Hardening (backend, ~1 sprint)
-H1–H4 from §6.1, plus H5 (refund/compensation decision). **Unlocks:** safe exposure of dispatch and driver APIs to real clients. Production-blocking.
+| Phase | Status | Remaining work | Depends on | Customer-visible | Infra | Multi-client | Prod-blocking |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 Foundation | ✅ | — | — | ✓ | | | |
+| 1 Hardening | ✅ (H5 open) | Paid-then-cancelled refund policy; restaurant `ownerId` is public in restaurant payloads (low) | — | | ✓ | | ✓ |
+| 2 Kafka reliability | Not started | Delivery events; `orderId` partition key; deterministic ids; durable dedup + Redis persistence; DLQ + replay; outbox for order/delivery; richer payloads (`customerId`) | — | | ✓ | | ✓ |
+| 3 Operator clients | Not started | Auto-dispatch; `drivers/me/delivery`; **restaurant dashboard MVP**; **driver app MVP**; each with Maestro flows + CI from day one; replace the E2E stand-ins with real UI steps | 1, 2 | ✓ | ✓ | ✓ | ✓ |
+| 4 Notifications + push | Not started | Handlers for payment/driver/pickup/delivered; device tokens; `expo-notifications` (dev build); deep links; unread-count endpoint | 2 | ✓ | ✓ | ✓ | |
+| 5 Real-time tracking | Blocked | Location trail + ETA; Redis fan-out; realtime service + gateway WebSocket; swap `useOrderDelivery` from polling to socket; map | 2, 3 (driver app produces locations) | ✓ | ✓ | ✓ | |
+| 6 Product features | Partly unblocked | Avatar upload UI and reorder (no backend work); addresses, fees/ETA, reviews, promos, real payments (with H5), i18n/RTL, dark mode | varies | ✓ | | | |
+| 7 Production readiness | Ongoing | §10 | — | | ✓ | | ✓ |
 
-### Phase 2 — Kafka reliability (backend, ~2 sprints)
-1. **Publish delivery lifecycle events** (K1).
-2. Wire `DurableEventIdempotencyService` into `KafkaConsumerService`; add Redis to driver-service and notification-service; give Redis a persistence volume (K2, O4).
-3. Dead-letter topics plus a replay script (K2).
-4. Deterministic event IDs for order and delivery events (K3).
-5. Transactional outbox for order-service and delivery-service (K4).
-6. Partition key = `orderId`; versioned event envelopes with runtime validation.
-7. `customerId`/`restaurantId` in payment and delivery payloads (K5 prerequisite).
-
-**Unlocks:** Phases 3–5. Infrastructure; not customer-visible.
-
-### Phase 3 — Operator clients + auto-dispatch (new; multi-client)
-- **Backend:** auto-dispatch (delivery-service consumes `order.ready_for_pickup`, creates the delivery, and assigns a driver) (K6). Driver "current job" endpoint. Optional offer/accept flow.
-- **Restaurant dashboard MVP** (web): incoming orders, accept/prepare/ready, open/close, menu and availability, image uploads.
-- **Driver app MVP** (Expo): online/offline, current delivery, pickup/start/complete, foreground location sending.
-- Each client gets git + CI from day one (same template as P0-1).
-
-**Unlocks:** a real end-to-end business flow without scripts; location data for Phase 5. Customer-visible (orders actually progress). Production-blocking.
-
-### Phase 4 — Notifications + push
-Implement the empty handlers (payment, driver assigned, picked up, delivered, payment failed) using the Phase 2 payloads. Add a device-token endpoint, sender, and `expo-notifications` (needs a development build). Add deep links (`customermobile://order/<id>`), an unread-count endpoint, and H4 if not already done. Customer-visible.
-
-### Phase 5 — Real-time tracking
-Location trail + ETA in tracking-service, and Redis Pub/Sub fan-out. Realtime service (WebSocket, JWT on connect, ownership check on subscribe) with gateway `ws: true`. Back `useOrderDelivery` with the socket, keeping polling as fallback. Map panel (choose `expo-maps` vs `react-native-maps` after checking SDK 57 docs). Background location in the driver app. Multi-client, customer-visible.
-
-### Phase 6 — Customer product features
-App-only, can happen any time: **avatar upload** (backend ready), **reorder**, favorites (local first).
-Backend-dependent: saved addresses, delivery fee/tax/ETA, cuisine tags, reviews, promotions, real payment provider (and refunds for H5), scheduled orders, i18n/RTL, dark mode (needs a light wordmark).
-
-### Phase 7 — Production readiness (continuous; gates launch)
-See §9. Must-haves before production: timeouts/retries (O1), correlation propagation + tracing (O2), graceful shutdown (O3), metrics/alerting including Kafka consumer lag, backups/restore drill, secrets management, staging environment, deploy + rollback pipelines, media cleanup (M1), emulator-reachable media URLs (M2).
-
-### Backlog (prioritized)
-
-| ID | Item | Depends on | Unlocks | Customer-visible | Infra | Multi-client | Prod-blocking | Effort |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| H1–H4 | Authz/rate-limit fixes | — | Safe operator APIs | — | ✓ | — | ✓ | S each |
-| H5 | Paid-then-cancelled compensation | — | Correct money flow | ✓ | ✓ | — | ✓ | M |
-| K1 | Publish delivery events | — | Notifications, tracking, auto-dispatch | — | ✓ | — | ✓ | M |
-| K2 | Durable dedup + DLQ + Redis persistence | — | Reliable consumers | — | ✓ | — | ✓ | M |
-| K3/K4 | Deterministic IDs + outbox | K1 | No lost or duplicate events | — | ✓ | — | ✓ | L |
-| K5 | Richer event payloads | K1 | Phase 4 | — | ✓ | — | — | S |
-| K6 | Auto-dispatch | K1, H1 | Orders progress without a dispatcher | ✓ | ✓ | — | ✓ | M |
-| C1 | Restaurant dashboard MVP | H1, K6 | Kitchen workflow | ✓ | — | ✓ | ✓ | L |
-| C2 | Driver app MVP | H2, K6 | Deliveries + location | ✓ | — | ✓ | ✓ | L |
-| N1 | Notification handlers + push | K5 | Alerts beyond "confirmed" | ✓ | ✓ | ✓ | — | L |
-| T1 | Realtime service + WS gateway | K1, C2 | Live tracking | ✓ | ✓ | ✓ | — | L |
-| T2 | Live map in customer app | T1 | — | ✓ | — | — | — | M |
-| A1 | Avatar upload UI | — | — | ✓ | — | — | — | S |
-| A2 | Reorder | — | — | ✓ | — | — | — | S |
-| R1 | Timeouts/retries/shutdown/correlation | — | Operability | — | ✓ | — | ✓ | M |
-| R2 | Metrics, tracing, alerting | R1 | Operability | — | ✓ | — | ✓ | L |
-
-**Answering the sequencing questions:**
-1. *Fix first:* H1–H4, then K1.
-2. *What unlocks what:* K1 → K6 → C1/C2 → T1. K5 → N1.
-3. *Customer-visible:* H5, K6, C1/C2 (orders progress), N1, T1/T2, A1/A2.
-4. *Infrastructure:* K2–K5, R1–R2.
-5. *Multi-client:* C1, C2, N1, T1.
-6. *Blocking production:* Phase 1, K1–K4, K6, C1, C2, R1, R2, backups, secrets.
-7. *Optional growth:* Phase 6 and the Future Enhancements (§10).
+**Why tracking moved behind operator clients:** real-time tracking needs (a) published delivery events, (b) a driver client sending locations, and (c) auto-dispatch so there's something to track without a person driving the API. None of those exist yet.
 
 ---
 
-## 9. Missing engineering work (verified against the repo)
+## 7. E2E automation (permanent)
 
-| Area | Exists today | Gap | Phase |
+| Aspect | Current state |
+| --- | --- |
+| **Framework** | Maestro CLI 2.11 (web support is beta; Chromium). Chosen because it drives React Native on Android/iOS and web with one YAML syntax. No other E2E framework existed in either repo |
+| **Supported clients** | Customer app, **web build**. Android/iOS: flows use platform-neutral `id:` selectors (`testID` + `nativeID`), but no emulator job yet (B6). Restaurant/driver: no clients |
+| **Environment** | Compose project `delivery-plus-e2e` (base + test + e2e overlays): isolated DB/Redis/Kafka/object-storage volumes, gateway `:3100`, storage `:9100`, `PAYMENT_SUCCESS_RATE=1`. Runs next to the dev stack. `npm run e2e:env:reset` = down → up → seed |
+| **Deterministic seed** | `npm run seed:e2e`: `qa.customer`, `qa.customer2`, `qa.restaurant`, `qa.driver` @`delivery-plus.test` (test-only password via `E2E_PASSWORD`, localhost-only guard); QA Kitchen (fixed prices; one sold-out item), QA Night Cafe (closed); scenarios S1 delivered, S2 payment declined, S3 ready without a delivery, S4 another customer's order; manifest of generated ids |
+| **Smoke (PR)** | login → Home · search → restaurant → menu · add → quantity → total · cart → checkout → order |
+| **Regression (nightly)** | waiting-for-driver state · declined → Failed · another customer's order refused · gateway outage → offline state → recovery with session intact |
+| **Business (nightly)** | customer UI orders → restaurant prepare/ready → dispatch → driver pickup/start/complete → customer UI: Delivered + notification |
+| **Runner** | `e2e/scripts/run.mjs`: builds web against the E2E gateway (`--clear`), serves it, hosts a control server for stand-ins/fault injection, clears rate-limit keys (E2E Redis only), runs flows asynchronously |
+| **CI** | Customer app `ci.yml` (code checks, every push/PR) + `e2e.yml` (PR: smoke; nightly/manual: all). Starts the backend E2E stack from `BACKEND_REF`, seeds, runs headless |
+| **Failure artifacts** | JUnit per flow, screenshots and debug output per flow (`e2e/.artifacts`), backend compose logs on failure. Uploaded 14 days |
+| **Known limits** | Maestro web cannot scroll react-native-web lists (it scrolls the window; RN-Web keeps `body` overflow hidden), so headless runs use a 430×1600 viewport. Restaurant/driver steps are API stand-ins (labelled in the flow). Checkout decline can't be triggered from the UI (no payment input); covered via seeded S2 |
+| **Runtime** | ~7.7 min for all 9 flows locally (login dominates) |
+
+**Rule for new work:** every client gets `testID`s, a Maestro suite and CI from its first commit. Every critical business flow gets E2E coverage before it is called done.
+
+---
+
+## 8. Business-flow verification
+
+| Flow | Automatically verified | How | Not verified |
 | --- | --- | --- | --- |
-| Contract testing between services | Gateway public OpenAPI generated and CI-checked | No consumer-driven contracts for internal HTTP or Kafka payloads | 7 |
-| E2E business-flow tests | `scripts/e2e.ts` happy path in the CI integration workflow | No failure paths (decline, cancel, authz) or UI E2E; `verify-phase0` checks exist only as a local script | 7 (promote to CI) |
-| DB migrations | TypeORM migrations per service; migration-verification workflow | No rollback / zero-downtime guidance | 7 |
-| Secrets / env | `.env` files; prod overlay requires secrets | No secrets manager or rotation | 7 |
-| CI/CD per frontend | Customer app CI (P0-1) | No CD (EAS build/submit/update); future clients need CI | 3, 7 |
-| Backend deploy | CI, docker, integration, migration, PR-quality, security workflows | **No deploy or rollback pipeline, no staging** | 7 |
-| Kafka observability | Kafka UI in dev only | No consumer-lag metrics or alerts | 2, 7 |
-| Redis failure strategy | — | No persistence, no fallback when Redis is down (rate limit, cart, tracking) | 2, 7 |
-| API versioning | — | Routes unversioned (`/api/...`) | 7 |
-| Rate limiting | Redis limiter on auth/orders | Cart limit ignored (H3); no gateway-level limit | 1 |
-| Error handling | Shared `AppError` + normalized payloads with `correlationId` | — (good) | — |
-| Correlation / tracing | Per-service middleware | Not propagated (O2); no tracing | 7 |
-| Health checks | `/health`, `/health/live`, `/health/ready` on services | Gateway is liveness-only | 7 |
-| Graceful shutdown / timeouts / retries / breakers | Kafka consumer retries 3× | None for HTTP (O1, O3) | 7 |
-| Object-storage lifecycle | `pending/` expiry (1 day) | Orphan cleanup (M1) | 7 |
-| Backup / restore / DR | — | None | 7 |
-| Security scanning | CodeQL, `npm audit`, Trivy (fs + images) | No DAST / authz regression suite | 7 |
-| Monitoring / alerting / analytics / audit log | — | None | 7 |
+| Customer order cycle (sign in → browse → cart → checkout → order) | ✅ | UI (smoke) | — |
+| Restaurant prepares / ready | ⚠️ | API stand-in inside the business flow | No restaurant UI |
+| Dispatch + driver assignment | ⚠️ | API stand-in (manual dispatch) | No auto-dispatch, no UI |
+| Driver pickup / in transit / delivered | ⚠️ | API stand-in | No driver UI; no location streaming |
+| Customer sees delivery progress + Delivered | ✅ | UI (business flow, via polling) | Real-time push |
+| Notification after the order | ✅ | UI (Alerts shows "…has been confirmed") | Other notification types don't exist |
+| Payment decline | ✅ | UI (seeded S2) + API | Declining from the UI |
+| Authorization (other customer's order) | ✅ | UI + live API checks | — |
+| Temporary outage | ✅ | UI with gateway stopped/started | Slow network / partial failures |
+| Critical path via API only | ✅ | `npm run e2e` in backend CI | — |
+
+### Flow reference (source → destination, protocol, owner, events, storage, auth)
+
+| Flow | Path | Protocol | Data owner / storage | Events | Auth boundary |
+| --- | --- | --- | --- | --- | --- |
+| Order | App → Gateway → order-service (→ cart, restaurant) → payment-service → order (HTTP sync + `payment.*` consumer, compare-and-set) → notification-service | HTTP + Kafka | order/payment DBs, cart in Redis | `order.*`, `payment.*` | JWT; ownership in each service |
+| Kitchen | (stand-in) owner → order-service | HTTP | order DB | `order.preparing`, `order.ready_for_pickup` (no consumers) | JWT owner + restaurant ownership |
+| Delivery | owner → delivery-service (→ order-service with owner token; → driver-service with system token) → driver → delivery-service | HTTP | delivery + driver DBs | none published (B4) | Dispatch: admin or the order's restaurant owner; driver actions: assigned driver |
+| Tracking | driver → tracking-service → Redis (last location, 300s TTL); customer → tracking-service → delivery-service (user token) | HTTP (no push) | Redis | — | Driver: own location; customer: via delivery ownership |
+| Media / profile | App → user-service (presign) → S3 (direct POST to `pending/`) → user-service (confirm: byte check, content-addressed copy) → `avatarUrl` | HTTPS | S3 + user DB | — | JWT; key prefix bound to the requester |
 
 ---
 
-## 10. Future Enhancements
+## 9. Architecture reviews
 
-Beyond the roadmap. Each fits the current architecture (service-per-domain, Kafka events, S3 media).
+### Kafka (verified in code)
 
-**Customer:** multiple saved addresses with a geocoded pin, reorder, favorites, ratings/reviews after `DELIVERED`, coupons/promotions, scheduled orders, Arabic/RTL, dark mode, richer tracking (ETA, driver card, route), saved payment methods with a real provider, order help/support chat.
-
-**Driver:** background location, turn-by-turn handoff to the maps app, proof of delivery (photo via the existing S3 flow), OTP delivery confirmation, availability and shift scheduling, earnings and payouts, job offers with accept/decline.
-
-**Restaurant:** preparation workflow and kitchen display, menu management with stock/out-of-stock (availability toggle exists), opening hours (status is manual today), prep-time estimates, sales analytics, restaurant-funded promotions.
-
-**Platform:** geospatial search (PostGIS) and delivery radius, full-text/fuzzy search, pricing engine and dynamic delivery fees, recommendations, fraud detection (payments, promo abuse), an event warehouse fed from Kafka for analytics, feature flags, multi-region readiness (partitioned topics, stateless services, CDN for media).
-
----
-
-## 11. Verification log (2026-09-30)
-
-| Area | Command | Result |
+| Area | Finding | Needed before real-time |
 | --- | --- | --- |
-| App CI steps, fresh clone | `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run export:web` | All pass (36 tests, 13 routes exported) |
-| App (working copy) | same | All pass |
-| Backend unit tests | `npm test` (all 13 workspaces) | 331 passed, 15 skipped (existing DB-integration suite) |
-| Backend build | `npm run build` | Pass |
-| Backend lint | `npm run lint` | 0 errors (warnings are `no-explicit-any`, mostly in specs) |
-| OpenAPI contract | `npm run openapi:generate` + `openapi:validate` | 56 paths valid |
-| Rebuilt services | `docker compose … up -d --build --wait order-service payment-service delivery-service tracking-service` | Healthy |
-| Live Phase 0 checks | local verification script through the gateway | 24/24 (two location checks re-run with a fresh location; driver locations expire after 300s) |
-| DB state | `psql` on `order_service`, `payment_service` | Declined order `FAILED`; cancel-then-decline order `CANCELLED`; payments `FAILED` with side effects synced |
-| Critical path | `npm run seed`, `npm run e2e` | Pass |
-| Demo data | `npm run seed:demo` | Pass; created a real `FAILED` order without workarounds |
-| Migrations / Compose | — | Not affected (no schema or Compose changes) |
+| Delivery lifecycle events | `publishEvent` exists, never called; order/driver consumers of `delivery.*` never fire | ✅ publish |
+| Durable idempotency | Built (`DurableEventIdempotencyService`), not wired; in-memory `Set` | ✅ wire + Redis persistence |
+| DLQ / replay | None; exhausted messages logged and committed | ✅ |
+| Event ids | Payment deterministic (UUID v5); order and delivery random `uuidv4()` | ✅ deterministic |
+| Payloads | Order has `customerId`/`restaurantId`; payment and delivery don't | ✅ add |
+| Partitioning / order | **Key = random per-event `correlationId`** → no per-order ordering; single-partition topics hide it | ✅ key by `orderId` |
+| Outbox | None: order-service publishes after commit (lost on crash); payment re-publishes via status markers | ✅ for order/delivery |
+| Topic provisioning | Fixed: consumers ensure topics (default 1 partition, broker defaults) | Explicit partitions/replication in prod |
+| Double writers | HTTP sync + consumers for payment statuses; now safe (compare-and-set, tolerant consumer) | Keep until the outbox makes events authoritative |
 
-**Not verified:** GitHub-hosted CI runs (no remote configured); visual check of the delivery card on a device or emulator.
+### S3 / media (verified)
+
+| Entity | Client | API (presign → confirm) | Storage → DB | Authorization | Verified live |
+| --- | --- | --- | --- | --- | --- |
+| Customer avatar | Customer app: **no upload UI** | `POST /users/me/avatar/image-upload-url` → `…/confirm` | `users/<id>/avatar/<sha256>` → `user_profiles.avatarUrl` | JWT; prefix bound to own id | ✅ (seed:demo) |
+| Restaurant cover/logo | None (API/seed) | `POST /restaurants/:id/image-upload-url` → `…/image-confirm` | `restaurants/<id>/<type>/…` → `coverImageUrl`/`logoUrl` | RESTAURANT_OWNER + ownership on both steps | ✅ cover (seed:demo) |
+| Menu item image | None | `POST /menus/menu-items/:id/image-upload-url` → `…/image-confirm` | `restaurants/<rid>/menu-items/<id>/…` → `imageUrl` | Owner + restaurant ownership on both steps | ⚠️ no seed exercises it |
+
+Failure handling: presign policies enforce content type and size; confirm re-verifies the bytes; `pending/` expires after 1 day. **Gaps:** replaced images are never deleted; an object copied before a failed DB write is orphaned (documented); dev/E2E URLs are `localhost:9000`/`:9100`, which Android emulators and devices can't reach. No redesign needed.
 
 ---
 
-## 12. References
+## 10. Production readiness
 
-- App: `.project-context/`, `.github/skills/react-native-design-system/BRANDING.md`, `.github/workflows/ci.yml`
-- Backend: `.project-context/16-current-state.md`, `05-event-driven-design.md`, `13-known-issues-and-gotchas.md`, `15-media-and-storage.md`, `docs/openapi/delivery-plus-public.json`
-- Demo data: `scripts/seed-demo.ts` (`npm run seed:demo`)
+| Area | Exists | Gap |
+| --- | --- | --- |
+| Deployment | Image builds + Trivy scans; prod compose overlay | No deploy pipeline, no staging |
+| Rollback | — | No rollback procedure; migrations have no down-path policy |
+| Staging | — | None (the E2E stack is the closest parity environment) |
+| Observability | Structured logs, correlation-id middleware | No log aggregation; correlation ids not propagated across service HTTP calls or Kafka |
+| Tracing / metrics | — | No OpenTelemetry, no metrics, no Kafka consumer-lag monitoring |
+| Health | `/health`, `/health/live`, `/health/ready` per service | Gateway liveness only; no graceful shutdown hooks |
+| Resilience | Kafka consumer retries (3×) | No HTTP timeouts, retries or circuit breakers between services |
+| Backups / recovery | — | No Postgres backups, restore drill or DR plan; Redis without persistence |
+| Secrets | `.env`, prod overlay requires secrets | No secrets manager or rotation |
+| Security | CodeQL, `npm audit`, Trivy; authz hardening + tests | No DAST; no audit log; authz regression checks exist only as unit tests + local scripts |
+| Rate limiting | Redis limiter on auth, orders, cart | No gateway-level limit |
+| E2E in CI | Workflow written, local 9/9 | Blocked by B5 |
+| Analytics | — | No event warehouse |
+
+---
+
+## 11. Future enhancements (product, beyond required work)
+
+- **Customer:** saved addresses with a geocoded pin, reorder, favorites, ratings/reviews after delivery, coupons, scheduled orders, Arabic/RTL, dark mode (needs a light wordmark), richer tracking (ETA, driver card, route), saved payment methods, in-app support chat.
+- **Driver:** background location, hand-off to a navigation app, proof of delivery (photo via the existing S3 flow), OTP confirmation at the door, shift and availability planning, earnings, offer/accept flow.
+- **Restaurant:** kitchen display, prep-time estimates, opening hours (status is manual today), stock/out-of-stock scheduling (availability toggle exists), sales analytics, restaurant-funded promotions.
+- **Platform:** geospatial search and delivery radius (PostGIS), fuzzy search, pricing engine and dynamic delivery fees, recommendations, fraud detection (payments, promo abuse), Kafka → warehouse analytics, feature flags, multi-region readiness.
+
+---
+
+## 12. Verification log (2026-09-30)
+
+| Area | Command / check | Result |
+| --- | --- | --- |
+| Backend unit | `npm test` (13 workspaces) | 357 passed, 15 skipped (DB-integration suite) |
+| Backend build / lint | `npm run build`, `npm run lint` | Pass; 0 errors in all workspaces |
+| Contract | `npm run openapi:generate` + `openapi:validate` | 56 paths valid (drivers/refund auth updated) |
+| Compose | `docker compose … config --quiet` (dev, test, e2e) | Valid |
+| Live hardening | gateway checks against the dev stack | 18/18 (cart limit re-checked on a clean window: 429 at request 31) |
+| E2E env | `npm run e2e:env:reset` from empty volumes | Healthy, 0 restarts; seed OK; 2 notifications, 0 duplicates |
+| UI / E2E | `node e2e/scripts/run.mjs --suite all --build --headless` after reset | **9/9 passed**, 9 JUnit reports, 0 failures |
+| App code checks | typecheck, lint, vitest | Pass; 40 unit tests |
+
+---
+
+## 13. Planning changes in this revision
+
+- Added: hardening results, five E2E-found defects, the permanent **E2E automation** section, **business-flow verification**, Kafka and S3 reviews, **current blockers** and **current sprint**.
+- Phase 1 (Hardening) marked done; Kafka reliability is now the next phase and a hard prerequisite for dispatch, notifications and tracking.
+- Real-time tracking stays after operator clients: it needs a driver client and published delivery events.
+- New rule: every client ships with `testID`s, a Maestro suite and CI; stand-ins in the business flow are replaced as the restaurant and driver clients land.
+- Production readiness moved into its own tracked section, separate from product enhancements.
