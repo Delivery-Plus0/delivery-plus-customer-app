@@ -7,10 +7,11 @@ import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { FormTextInput } from '@/components/ui/form-text-input';
 import { InlineAlert } from '@/components/ui/inline-alert';
+import { API_BASE_URL } from '@/config/api';
 import { Spacing } from '@/constants/theme';
-import { ApiError } from '@/services/api';
 import { loginAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
+import { describeLoginError } from '@/utils/login-errors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -19,6 +20,10 @@ export default function LoginScreen() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [failures, setFailures] = useState(0);
+  // State updates land on the next render, so Enter + a tap in quick succession could both pass an
+  // `isSubmitting` check and send two sign-in requests. A ref is checked and set synchronously.
+  const inFlight = useRef(false);
   const passwordRef = useRef<TextInput>(null);
 
   const emailError = !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined;
@@ -27,8 +32,9 @@ export default function LoginScreen() {
 
   async function handleSubmit() {
     setSubmitted(true);
-    if (emailError || passwordError || isSubmitting) return;
+    if (emailError || passwordError || inFlight.current) return;
 
+    inFlight.current = true;
     setError(null);
     setIsSubmitting(true);
     try {
@@ -36,10 +42,22 @@ export default function LoginScreen() {
       await setSession(auth.accessToken);
       router.replace('/home');
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Unable to sign in right now.');
+      const consecutiveFailures = failures + 1;
+      setFailures(consecutiveFailures);
+      setError(describeLoginError(caught, consecutiveFailures));
     } finally {
+      inFlight.current = false;
       setIsSubmitting(false);
     }
+  }
+
+  /** Editing a field makes the previous error stale. Lockout is per account, so a new email restarts the count. */
+  function edit(setter: (value: string) => void, { newAccount = false } = {}) {
+    return (value: string) => {
+      setter(value);
+      setError(null);
+      if (newAccount) setFailures(0);
+    };
   }
 
   return (
@@ -63,7 +81,7 @@ export default function LoginScreen() {
         testID="login-email"
         label="Email"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={edit(setEmail, { newAccount: true })}
         onBlur={() => setTouched((current) => ({ ...current, email: true }))}
         error={show('email') ? emailError : undefined}
         placeholder="you@example.com"
@@ -81,7 +99,7 @@ export default function LoginScreen() {
         ref={passwordRef}
         label="Password"
         value={password}
-        onChangeText={setPassword}
+        onChangeText={edit(setPassword)}
         onBlur={() => setTouched((current) => ({ ...current, password: true }))}
         error={show('password') ? passwordError : undefined}
         placeholder="Your password"
@@ -99,6 +117,13 @@ export default function LoginScreen() {
       ) : null}
 
       <AppButton testID="login-submit" title="Sign in" onPress={() => void handleSubmit()} loading={isSubmitting} />
+
+      {__DEV__ ? (
+        // Development builds only: the dev (:3000) and E2E (:3100) backends have different accounts.
+        <ThemedText type="small" themeColor="textSecondary" style={styles.devHint} testID="login-api-hint">
+          API: {API_BASE_URL}
+        </ThemedText>
+      ) : null}
     </AuthFormShell>
   );
 }
@@ -106,5 +131,9 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   alert: {
     marginBottom: Spacing.three,
+  },
+  devHint: {
+    marginTop: Spacing.two,
+    textAlign: 'center',
   },
 });
