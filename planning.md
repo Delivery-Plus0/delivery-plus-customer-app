@@ -1,6 +1,6 @@
 # Delivery Plus — Platform & Customer App Planning
 
-_Last updated: 2026-10-01, after Kafka reliability (Phase 2 core)._
+_Last updated: 2026-10-01, after Kafka reliability, delivery retry safety and the GitHub issue reconciliation._
 
 This plan covers the customer app (`delivery-plus-customer-app`) and the backend (`delivery-plus`). It is rebuilt from the code and from what the automated runs actually showed. **Definition of done:** a change is done only when the right levels of verification pass: unit → integration (live API) → contract (OpenAPI) → UI/E2E → business flow. Each "done" below names the levels it has.
 
@@ -31,7 +31,12 @@ This plan covers the customer app (`delivery-plus-customer-app`) and the backend
   - Consumers deduplicate in Redis (which now persists to disk).
   - Failed messages go to `<topic>.dlq` and can be replayed with `npm run kafka:dlq`.
   - Still missing: a transactional outbox, and `customerId` in payment/delivery payloads.
-- **Hardening + E2E backend work is pushed** (`feat/hardening-e2e-env`); the PR still has to be opened (the GitHub CLI isn't signed in on this machine).
+- **Both backend branches are pushed and stacked** (`dev` → `feat/hardening-e2e-env` → `feat/kafka-reliability`); no PR is open yet. PR descriptions are drafted (PR 1 closes #52; PR 2 closes #2, #3, #4, #43, #44).
+- **Delivery actions are now retry-safe.** A failed driver release or order sync after a delivery was marked done used to leave the driver BUSY forever; the retry now repairs it (verified live with services taken down).
+- **The GitHub tracker matches the code:**
+  - 56 issues reviewed: 11 closed (5 done, 6 duplicates).
+  - 6 new issues for real gaps (#95–#100).
+  - Every open issue has a phase milestone (§6).
 
 ---
 
@@ -62,6 +67,7 @@ This plan covers the customer app (`delivery-plus-customer-app`) and the backend
 | **K3** Delivery events published | created / driver_assigned / picked_up / in_transit / completed / cancelled, after the HTTP syncs | Unit (every transition, ordering, nothing on rejection); live: 5 events per delivered order; E2E env seed |
 | **K4** Tolerant delivery consumers | order-service applies delivery events like payment events (same status no-op, stale skipped). driver-service's release consumer removed (a late `completed` could free a busy driver) | Unit; live: 0 dead-lettered messages across seed + e2e |
 | **K5** Durable idempotency | `KafkaConsumerService` claims each event in Redis per consumer group (order-service, notification-service); Redis AOF + volume | Unit (processed / in-progress / Redis down); live: offsets rewound, 6 redelivered events skipped, 0 duplicate notifications |
+| **K7** Retry-safe delivery actions | Compare-and-set delivery writes; repeating an action re-runs its side effects instead of 409; driver released first, idempotently, never while on another delivery; lagging order catches up step by step; failed assignment gives the driver back. `maxHandlerAttempts` configurable | Unit (15 regression tests); live on the E2E stack: order-service down → driver still released, retry delivers; driver-service down → retry releases; 9/9 Maestro after reset |
 | **K6** Dead-letter topics + replay | 3 attempts → `<topic>.dlq` with `dlq-*` headers; offset committed only once handled or dead-lettered; `npm run kafka:dlq -- <topic> [--replay]` | Unit (handler failure, poison message, DLQ send failure); live: forced failure + poison message dead-lettered, replay created the notification exactly once, second replay found nothing |
 
 ---
@@ -71,8 +77,8 @@ This plan covers the customer app (`delivery-plus-customer-app`) and the backend
 | Client | Exists | Services used | Complete workflows | Missing |
 | --- | --- | --- | --- | --- |
 | **Customer app** (Expo 57; web build under E2E) | ✅ | auth, users, restaurants, menus, cart, orders, payments, deliveries, notifications | sign in, browse/search, cart, checkout, order status + delivery polling, cancel, notifications, profile | avatar upload UI, push, live map, native (Android/iOS) E2E |
-| **Restaurant dashboard** | ❌ | — | — | whole client. Contract exists: owner order list, status transitions, dispatch, menu/images |
-| **Driver app** | ❌ | — | — | whole client. **Missing contract: "my current delivery"** (drivers cannot discover their assignment) |
+| **Restaurant dashboard** | ❌ | — | — | whole client (#100). Contract exists: owner order list, status transitions, menu/images; dispatch becomes automatic with #97 |
+| **Driver app** | ❌ | — | — | whole client (#99). **Missing contracts:** current delivery (#96), drop-off address on the order (#95), and a driver must not free themselves while busy (#33) |
 | **Admin / ops** | ❌ | Swagger, Kafka UI (dev) | — | whole client |
 
 ---
@@ -82,49 +88,62 @@ This plan covers the customer app (`delivery-plus-customer-app`) and the backend
 | # | Blocker | Blocks | Owner |
 | --- | --- | --- | --- |
 | B1 | **No restaurant client** | Real kitchen workflow; restaurant UI E2E | New client |
-| B2 | **No driver client**, and no "current delivery" endpoint | Real delivery workflow; driver UI E2E; real location data for tracking | New client + delivery-service |
-| B3 | **No auto-dispatch** (delivery-service consumes no events) | Orders progressing without a person calling the API | delivery-service |
+| B2 | **No driver client** (#99), no "current delivery" contract (#96), **orders have no delivery address** (#95) | Real delivery workflow; driver UI E2E; real location data for tracking | New client + delivery/order-service |
+| B3 | **No auto-dispatch** (#97; delivery-service consumes no events) | Orders progressing without a person calling the API | delivery-service |
+| B7 | **A BUSY driver can set themselves AVAILABLE** (`POST /drivers/me/online` or `me/status`) and get a second delivery (#33) | Correct assignment once drivers use an app | driver-service |
 | ~~B4~~ | ~~Delivery events never published~~ — **resolved** (K3). Remaining: payloads lack `customerId` (notifications), no outbox | Notifications beyond "confirmed" | delivery/payment-service |
-| B5 | **E2E CI cannot run yet:** the backend branch `feat/hardening-e2e-env` is pushed but not merged (PR not opened: `gh` isn't signed in), and the app repo has no remote | Automated E2E in CI | Open + merge the backend PR; add the app remote |
+| B5 | **E2E CI cannot run yet:** `feat/hardening-e2e-env` is pushed but not merged (no PR yet), and the app repo has no remote | Automated E2E in CI | Open + merge PR 1; add the app remote |
 | B6 | Android/iOS E2E not set up (needs a development build + emulator; no Android SDK on this machine) | Native UI regression coverage | Platform |
 
 ---
 
-## 5. Current sprint (next)
+## 5. Current sprint (next) — Phase 3: automatic dispatch + driver contracts
 
-1. **Land the work:** open the PR for `feat/hardening-e2e-env` (then `feat/kafka-reliability`, which is stacked on it); push the app repo; run `e2e.yml` on GitHub and fix any Linux-only differences.
-2. **Dispatch + driver contracts** (Phase 3 start): auto-dispatch consumer in delivery-service (`order.ready_for_pickup` → create + assign), which now has reliable events to build on; `GET /drivers/me/delivery`.
-3. **Kafka follow-ups:** `customerId` in payment/delivery payloads + notification handlers (Phase 4); transactional outbox for order/delivery; graceful shutdown hooks.
-4. **Paid-then-cancelled compensation** (refund policy), now that refunds are admin-only.
+Goal: everything the driver app needs exists on the backend, and orders reach a driver without anyone calling the API. **The driver app itself is not built in this sprint.**
+
+| # | Issue | Work | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| 0 | — | Open + merge PR 1 (`feat/hardening-e2e-env`, closes #52), then PR 2 (`feat/kafka-reliability`, closes #2 #3 #4 #43 #44) | review | Both on `dev`; Integration CI green |
+| 1 | **#33** | Drivers cannot leave BUSY themselves (only delivery-service/admin); keep the retry-safe release | — | Unit + live: BUSY driver gets 403/409 on `me/online` and `me/status` |
+| 2 | **#95** | Snapshot the delivery address on the order at checkout | — | Migration + OpenAPI + customer checkout E2E passes |
+| 3 | **#96** | `GET /api/deliveries/me/current` with pickup + drop-off + next actions | #95 | Unit + live; other roles/drivers refused |
+| 4 | **#97** | delivery-service consumes `order.ready_for_pickup` → create + assign; waits for a driver instead of failing | PR 2 merged | Duplicate/replayed events create no second delivery; manual vs auto race safe |
+| 5 | E2E | `seed:e2e` + Maestro business flow: drop the restaurant "dispatch" stand-in (auto-dispatch); driver steps read the delivery via #96 instead of the manifest; `npm run e2e` updated | #96, #97 | 9/9 Maestro + `npm run e2e` green from a fresh environment |
+| 6 | #99 prep | Confirm the driver-app scope and repo; list screens against the contracts above; no app code | 1–4 | #99 updated with final contracts |
+
+Acceptance for the sprint: an order placed in the customer app reaches DELIVERED with **only** the restaurant's two status changes and the driver's three actions as API stand-ins (no manual delivery create/assign), and a driver can discover their delivery from the API alone.
 
 ---
 
-## 6. Phase roadmap (recalculated)
+## 6. Phase roadmap (recalculated) — GitHub milestones
 
 ```mermaid
 flowchart LR
-    P0[Phase 0 ✅] --> P1[Phase 1 Hardening ✅]
-    P1 --> P2[Phase 2 Kafka reliability]
-    P2 --> P3[Phase 3 Operator clients + auto-dispatch]
-    P2 --> P4[Phase 4 Notifications + push]
-    P3 --> P5[Phase 5 Real-time tracking]
-    P2 --> P5
-    P3 --> P6[Phase 6 Product features]
-    E[E2E automation — continuous, every client] -.-> P3
-    E -.-> P5
-    R[Phase 7 Production readiness — continuous] -.-> P6
+    P1[1 Hardening rest] --> P2[2 Kafka reliability ✅ core]
+    P2 --> P3[3 Auto-dispatch + driver contracts]
+    P3 --> P4[4 Driver + restaurant clients]
+    P4 --> P5[5 Full business flow E2E]
+    P2 --> P6[6 Notifications + push]
+    P4 --> P7[7 Real-time tracking]
+    P6 --> P7
+    P4 --> P8[8 Customer features]
+    R[9 Production readiness — continuous] -.-> P8
+    E[E2E automation — every client, every phase] -.-> P4
 ```
 
-| Phase | Status | Remaining work | Depends on | Customer-visible | Infra | Multi-client | Prod-blocking |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 Foundation | ✅ | — | — | ✓ | | | |
-| 1 Hardening | ✅ (H5 open) | Paid-then-cancelled refund policy; restaurant `ownerId` is public in restaurant payloads (low) | — | | ✓ | | ✓ |
-| 2 Kafka reliability | ✅ core (K1–K6) | Outbox for order/delivery; richer payloads (`customerId`); explicit partitions/replication for prod | — | | ✓ | | ✓ |
-| 3 Operator clients | Not started | Auto-dispatch; `drivers/me/delivery`; **restaurant dashboard MVP**; **driver app MVP**; each with Maestro flows + CI from day one; replace the E2E stand-ins with real UI steps | 1, 2 | ✓ | ✓ | ✓ | ✓ |
-| 4 Notifications + push | Not started | Handlers for payment/driver/pickup/delivered; device tokens; `expo-notifications` (dev build); deep links; unread-count endpoint | 2 | ✓ | ✓ | ✓ | |
-| 5 Real-time tracking | Blocked | Location trail + ETA; Redis fan-out; realtime service + gateway WebSocket; swap `useOrderDelivery` from polling to socket; map | 2, 3 (driver app produces locations) | ✓ | ✓ | ✓ | |
-| 6 Product features | Partly unblocked | Avatar upload UI and reorder (no backend work); addresses, fees/ETA, reviews, promos, real payments (with H5), i18n/RTL, dark mode | varies | ✓ | | | |
-| 7 Production readiness | Ongoing | §10 | — | | ✓ | | ✓ |
+**Order change vs. the proposed path** (Hardening → Kafka → Restaurant + Driver workflows → Automatic dispatch → …): automatic dispatch and the driver contracts come **before** the clients. They are backend-only, the driver app's first screen depends on them (#95, #96), and auto-dispatch removes a manual step the restaurant client would otherwise have to implement and then delete. E2E is continuous; Phase 5 is where the API stand-ins in the business flow are replaced by real client steps.
+
+| Milestone | Status | Open issues |
+| --- | --- | --- |
+| Phase 1 · Hardening (remaining) | Core done (PR 1) | #52 (done on branch), #42 checkout re-validation (canonical for #31 #40 #41 #47 #54), #53 cancellation + refund policy, #56 refund ledger, #18 stuck PROCESSING, #19 lease ownership, #59 owner data exposure |
+| Phase 2 · Kafka reliability | Core done (PR 2) | #2 #3 #4 #43 #44 (done on branch), #98 outbox, #23 event schema registry (later) |
+| Phase 3 · Auto-dispatch + driver contracts | **Next sprint** | #33, #95, #96, #97 |
+| Phase 4 · Driver + restaurant clients | Not started | #99 driver app, #100 restaurant dashboard |
+| Phase 5 · Full business flow E2E | Partly (stand-ins) | #13 (notification assertion; app E2E in CI) |
+| Phase 6 · Notifications + push | Blocked on PR 2 | #5, #50, #51 |
+| Phase 7 · Real-time tracking | Blocked on Phase 4 | #32, #46, #60 |
+| Phase 8 · Customer product features | Backlog | #34, #35, #48, #58 (+ avatar upload UI, reorder: app-only) |
+| Phase 9 · Production readiness | Backlog | #6, #7, #8, #14, #15, #16, #20, #30, #37, #38 |
 
 **Why tracking moved behind operator clients:** real-time tracking needs (a) published delivery events, (b) a driver client sending locations, and (c) auto-dispatch so there's something to track without a person driving the API. None of those exist yet.
 
@@ -251,10 +270,23 @@ Failure handling: presign policies enforce content type and size; confirm re-ver
 | Backend unit (Kafka phase, 2026-10-01) | `npm test`, `npm run build`, `npm run lint` | 385 passed, 15 skipped; build OK; 0 lint errors |
 | Kafka live (dev stack) | seed + `npm run e2e`; topic dump; offset rewind; forced failure + replay | Keys = `orderId`; 5 delivery events/order; 0 DLQ entries in normal flow; 6/6 redeliveries skipped; replay → exactly 1 notification |
 | UI / E2E (Kafka phase) | `e2e:env:reset` from empty volumes, then all Maestro suites | **9/9 passed** (business flow now emits delivery events at every step); afterwards 0 dead-lettered messages, 5 notifications / 0 duplicates, 0 container restarts |
+| UI / E2E (retry-safe delivery, 2026-10-01) | `e2e:env:reset`, all Maestro suites | **9/9 passed** |
+| Delivery failure injection (E2E stack) | stop order-service / driver-service during `complete`, then retry | 11/11 checks: driver released, order DELIVERED, no duplicate notifications, 0 dead letters |
 
 ---
 
 ## 13. Planning changes in this revision
+
+**2026-10-01 (retry safety + issue reconciliation):**
+- Found and fixed: a failed side effect after a delivery was marked done left the driver BUSY permanently (retries got 409). Added K7.
+- GitHub reconciled (§6):
+  - 56 issues reviewed: 5 closed as done, 6 as duplicates.
+  - #42 made canonical for checkout re-validation.
+  - 6 new issues: #95 delivery address, #96 current delivery, #97 auto-dispatch, #98 outbox, #99 driver app, #100 restaurant dashboard.
+  - 9 phase milestones.
+- Roadmap order changed: auto-dispatch and driver contracts before the clients (reason in §6).
+- New blocker B7 (#33): drivers can free themselves while busy.
+
 
 **2026-10-01 (Kafka reliability):**
 - Phase 2 core marked done (K1–K6); B4 resolved.
