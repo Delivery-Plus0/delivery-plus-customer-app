@@ -102,7 +102,7 @@ jobs:
       # useful on failure.
       - name: Upload E2E artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-${{ env.SUITE }}-${{ github.run_id }}
           path: e2e/.artifacts/
