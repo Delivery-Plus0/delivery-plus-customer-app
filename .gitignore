@@ -51,4 +51,5 @@ example
 
 # E2E build output, Maestro reports and screenshots
 e2e/.web-build/
+e2e/.driver-web-build/
 e2e/.artifacts/

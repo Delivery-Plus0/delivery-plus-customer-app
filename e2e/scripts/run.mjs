@@ -6,7 +6,10 @@
 //
 // Env: E2E_API_URL (http://localhost:3100), E2E_WEB_PORT (8083), E2E_CONTROL_PORT (8090),
 //      E2E_MANIFEST (../delivery-plus/e2e-seed-manifest.json), MAESTRO_BIN (maestro),
-//      E2E_COMPOSE_PROJECT (delivery-plus-e2e)
+//      E2E_COMPOSE_PROJECT (delivery-plus-e2e),
+//      DRIVER_APP_DIR (../delivery-plus-driver-app; the driver app for the cross-app flows),
+//      E2E_DRIVER_WEB_PORT (8084), E2E_SKIP_CROSS_APP (1 = skip cross-app flows, e.g. CI without
+//      access to the driver repo)
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -35,6 +38,17 @@ const WEB_BUILD = join(E2E_DIR, '.web-build');
 const SCREEN_SIZE = process.env.E2E_SCREEN_SIZE ?? '430x1600';
 const ARTIFACTS = join(E2E_DIR, '.artifacts', suite);
 
+// The real driver app (separate repo) takes part in the cross-app flows: its web build is served on
+// :8084 (allowed by the gateway's development CORS) and reports a fixed position, because Maestro's
+// web driver can't grant or fake geolocation.
+const DRIVER_APP_DIR = resolve(process.env.DRIVER_APP_DIR ?? join(APP_DIR, '..', 'delivery-plus-driver-app'));
+const DRIVER_WEB_PORT = Number(process.env.E2E_DRIVER_WEB_PORT ?? 8084);
+const DRIVER_APP_URL = `http://localhost:${DRIVER_WEB_PORT}`;
+const DRIVER_WEB_BUILD = join(E2E_DIR, '.driver-web-build');
+const DRIVER_FIXED_LOCATION = { latitude: 30.0444, longitude: 31.2357 };
+const CROSS_APP_FLOWS = new Set(['regression/order-awaiting-driver.yaml', 'business/customer-order-lifecycle.yaml']);
+const SKIP_CROSS_APP = process.env.E2E_SKIP_CROSS_APP === '1';
+
 const SUITES = {
   smoke: ['smoke/01-login.yaml', 'smoke/02-browse.yaml', 'smoke/03-cart.yaml', 'smoke/04-checkout.yaml'],
   regression: [
@@ -58,7 +72,7 @@ if (!existsSync(MANIFEST)) {
 const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
 
 // ---------------------------------------------------------------------------------------------
-// Gateway client used by the control server (restaurant/driver stand-ins).
+// Gateway client used by the control server (restaurant stand-in, fixtures, verifications).
 // ---------------------------------------------------------------------------------------------
 
 async function api(method, path, token, body) {
@@ -78,8 +92,8 @@ async function login(email) {
   return (await api('POST', '/api/auth/login', null, { email, password: manifest.password })).accessToken;
 }
 
-// Stand-in state for the restaurant/driver side of one order at a time.
-const state = { orderId: null, deliveryId: null };
+// The order the current flow is about (set by the restaurant stand-in / scenario).
+const state = { orderId: null };
 
 async function latestKitchenOrder(owner, status) {
   const restaurantId = manifest.restaurants['QA Kitchen'];
@@ -88,17 +102,6 @@ async function latestKitchenOrder(owner, status) {
   matching.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   if (!matching[0]) throw new Error(`No ${status} order at QA Kitchen`);
   return matching[0];
-}
-
-/** The QA driver's active delivery (GET /deliveries/me/current answers 204 → null when none). */
-async function currentDeliveryId(driver) {
-  const current = await api('GET', '/api/deliveries/me/current', driver);
-  if (!current) throw new Error('The QA driver has no active delivery');
-  if (state.orderId && current.orderId !== state.orderId) {
-    throw new Error(`The QA driver is on order ${current.orderId}, expected ${state.orderId}`);
-  }
-  state.deliveryId = current.id;
-  return current.id;
 }
 
 async function waitForOrderStatus(orderId, token, status, timeoutMs = 20_000) {
@@ -131,6 +134,50 @@ function resetRateLimits() {
   );
 }
 
+/** Messages ever written to each dead-letter topic (end offsets summed over partitions; 0 if absent). */
+function deadLetterCounts() {
+  const counts = {};
+  for (const topic of ['order.events.dlq', 'payment.events.dlq', 'delivery.events.dlq']) {
+    let out = '';
+    try {
+      out = docker('exec', container('kafka'), 'kafka-run-class', 'kafka.tools.GetOffsetShell', '--broker-list', 'localhost:9092', '--topic', topic, '--time', '-1');
+    } catch {
+      out = ''; // topic not created yet → nothing dead-lettered
+    }
+    counts[topic] = out
+      .split('\n')
+      .map((line) => Number(line.trim().split(':')[2]))
+      .filter(Number.isFinite)
+      .reduce((sum, n) => sum + n, 0);
+  }
+  return counts;
+}
+
+/** Rows in delivery-service's own table for one order (proves there is no duplicate delivery). */
+function deliveryRowsForOrder(orderId) {
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) throw new Error(`Not an order id: ${orderId}`);
+  const out = docker('exec', container('postgres'), 'psql', '-U', 'postgres', '-d', 'delivery_service', '-Atc', `select count(*) from deliveries where "orderId" = '${orderId}'`);
+  return Number(out.trim());
+}
+
+/**
+ * Suite fixture, not a flow step: the seed's driver state (QA driver free and AVAILABLE). A flow that
+ * failed half-way can leave the QA driver on a delivery; this finishes it through the API so the next
+ * run starts clean. The flows themselves drive the driver only through the driver app.
+ */
+async function restoreSeedDriverState() {
+  const driver = await login(manifest.accounts.driver.email);
+  const current = await api('GET', '/api/deliveries/me/current', driver);
+  const steps = ['pickup', 'start', 'complete'];
+  const first = current?.nextActions?.[0];
+  if (first) {
+    for (const action of steps.slice(steps.indexOf(first))) await api('POST', `/api/deliveries/${current.id}/${action}`, driver, {});
+  }
+  await api('POST', '/api/drivers/me/online', driver, {});
+}
+
+let deadLettersAtStart = null;
+
 async function waitForGateway(up, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -147,7 +194,6 @@ const actions = {
     const owner = await login(manifest.accounts.restaurant.email);
     const order = await latestKitchenOrder(owner, 'CONFIRMED');
     state.orderId = order.id;
-    state.deliveryId = null;
     await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'PREPARING' });
   },
   'restaurant/ready': async () => {
@@ -155,8 +201,9 @@ const actions = {
     await api('PATCH', `/api/orders/${state.orderId}/status`, owner, { status: 'READY_FOR_PICKUP' });
   },
   // There is no dispatch stand-in: delivery-service dispatches on order.ready_for_pickup by itself.
+  // There is no driver stand-in either: flows drive the QA driver through the real driver app.
 
-  // A ready order with no driver free: the QA driver must be offline first (driver/offline).
+  // A ready order with no driver free: the QA driver must be offline first (in the driver app).
   // Placed through the API as the QA customer, then prepared and marked ready by the restaurant.
   'scenario/order-ready': async () => {
     const customer = await login(manifest.accounts.customer.email);
@@ -170,29 +217,33 @@ const actions = {
     await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'PREPARING' });
     await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'READY_FOR_PICKUP' });
     state.orderId = order.id;
-    state.deliveryId = null;
   },
-  // DRIVER stand-in (qa.driver). It finds its job the way the driver app will: GET /deliveries/me/current.
-  'driver/offline': async () => {
-    const driver = await login(manifest.accounts.driver.email);
-    await api('POST', '/api/drivers/me/offline', driver, {});
+  // VERIFICATIONS (read-only, as the customer or from the stack's own stores).
+  // The customer's tracking view returns the position the driver app sent (fixed in its E2E build).
+  'tracking/assert-location': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    const delivery = await api('GET', `/api/deliveries/by-order/${state.orderId}`, customer);
+    const deadline = Date.now() + 20_000;
+    for (;;) {
+      const tracking = await api('GET', `/api/tracking/delivery/${delivery.id}`, customer);
+      const { latitude, longitude } = tracking.location ?? {};
+      if (latitude === DRIVER_FIXED_LOCATION.latitude && longitude === DRIVER_FIXED_LOCATION.longitude) return;
+      if (Date.now() > deadline) throw new Error(`No driver location for delivery ${delivery.id} (got ${JSON.stringify(tracking.location)})`);
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
   },
-  'driver/online': async () => {
-    const driver = await login(manifest.accounts.driver.email);
-    await api('POST', '/api/drivers/me/online', driver, {});
-  },
-  'driver/pickup': async () => {
-    const driver = await login(manifest.accounts.driver.email);
-    await api('POST', '/api/tracking/location', driver, { latitude: 30.0444, longitude: 31.2357 });
-    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/pickup`, driver, {});
-  },
-  'driver/start': async () => {
-    const driver = await login(manifest.accounts.driver.email);
-    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/start`, driver, {});
-  },
-  'driver/complete': async () => {
-    const driver = await login(manifest.accounts.driver.email);
-    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/complete`, driver, {});
+  // After the cycle: order and delivery DELIVERED, exactly one delivery for the order (automatic
+  // dispatch, no duplicate), and nothing new in any dead-letter topic since the suite started.
+  'verify/order-integrity': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    await waitForOrderStatus(state.orderId, customer, 'DELIVERED');
+    const delivery = await api('GET', `/api/deliveries/by-order/${state.orderId}`, customer);
+    if (delivery.status !== 'DELIVERED') throw new Error(`Delivery ${delivery.id} is ${delivery.status}, expected DELIVERED`);
+    const rows = deliveryRowsForOrder(state.orderId);
+    if (rows !== 1) throw new Error(`Order ${state.orderId} has ${rows} deliveries, expected exactly 1`);
+    const now = deadLetterCounts();
+    const grown = Object.keys(now).filter((topic) => now[topic] !== deadLettersAtStart[topic]);
+    if (grown.length) throw new Error(`New dead letters: ${grown.map((t) => `${t} ${deadLettersAtStart[t]} → ${now[t]}`).join(', ')}`);
   },
   // Fault injection for the offline-recovery flow.
   'gateway/stop': async () => {
@@ -219,17 +270,27 @@ const control = createServer(async (req, res) => {
 
 // ---------------------------------------------------------------------------------------------
 
-function buildWeb() {
-  console.log(`Building web app against ${API_URL} ...`);
-  rmSync(WEB_BUILD, { recursive: true, force: true });
+function buildWeb(appDir = APP_DIR, outDir = WEB_BUILD, extraEnv = {}) {
+  console.log(`Building ${appDir} for web against ${API_URL} ...`);
+  rmSync(outDir, { recursive: true, force: true });
   // --clear matters: a warm Metro cache can keep a previously inlined EXPO_PUBLIC_API_BASE_URL.
-  const result = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', WEB_BUILD, '--clear'], {
-    cwd: APP_DIR,
+  const result = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', outDir, '--clear'], {
+    cwd: appDir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, CI: '1', EXPO_PUBLIC_API_BASE_URL: API_URL },
+    env: { ...process.env, CI: '1', EXPO_PUBLIC_API_BASE_URL: API_URL, ...extraEnv },
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function buildDriverWeb() {
+  if (!existsSync(join(DRIVER_APP_DIR, 'package.json'))) {
+    console.error(`Driver app not found at ${DRIVER_APP_DIR}. Clone delivery-plus-driver-app next to this repo (npm ci), set DRIVER_APP_DIR, or set E2E_SKIP_CROSS_APP=1.`);
+    process.exit(2);
+  }
+  buildWeb(DRIVER_APP_DIR, DRIVER_WEB_BUILD, {
+    EXPO_PUBLIC_FIXED_LOCATION: `${DRIVER_FIXED_LOCATION.latitude},${DRIVER_FIXED_LOCATION.longitude}`,
+  });
 }
 
 /**
@@ -243,6 +304,8 @@ function runFlow(flow) {
   const env = {
     APP_URL,
     CONTROL_URL,
+    DRIVER_APP_URL,
+    DRIVER_EMAIL: manifest.accounts.driver.email,
     EMAIL: manifest.accounts.customer.email,
     PASSWORD: manifest.password,
     FAILED_ORDER_ID: manifest.orders.failed,
@@ -275,7 +338,12 @@ function runFlow(flow) {
 }
 
 async function main() {
+  const flows = SUITES[suite].filter((flow) => !(SKIP_CROSS_APP && CROSS_APP_FLOWS.has(flow)));
+  const skipped = SUITES[suite].filter((flow) => !flows.includes(flow));
+  const crossApp = flows.some((flow) => CROSS_APP_FLOWS.has(flow));
+
   if (flag('build') || !existsSync(join(WEB_BUILD, 'index.html'))) buildWeb();
+  if (crossApp && (flag('build') || !existsSync(join(DRIVER_WEB_BUILD, 'index.html')))) buildDriverWeb();
   mkdirSync(ARTIFACTS, { recursive: true });
 
   await fetch(`${API_URL}/health`).then(
@@ -283,27 +351,40 @@ async function main() {
     () => { throw new Error(`E2E gateway not reachable at ${API_URL}. Start it with \`npm run e2e:env:up\` in delivery-plus.`); },
   );
 
-  const web = spawn(process.execPath, [join(E2E_DIR, 'scripts', 'serve-web.mjs'), WEB_BUILD, String(WEB_PORT)], { stdio: 'inherit' });
+  const serve = (dir, port) => spawn(process.execPath, [join(E2E_DIR, 'scripts', 'serve-web.mjs'), dir, String(port)], { stdio: 'inherit' });
+  const web = serve(WEB_BUILD, WEB_PORT);
+  const driverWeb = crossApp ? serve(DRIVER_WEB_BUILD, DRIVER_WEB_PORT) : null;
   await new Promise((r) => control.listen(CONTROL_PORT, '127.0.0.1', r));
   await new Promise((r) => setTimeout(r, 500));
 
+  // Fixture: start from the seed's driver state, and remember the dead-letter counts to compare.
+  if (crossApp) await restoreSeedDriverState();
+  deadLettersAtStart = deadLetterCounts();
+
   const results = [];
   try {
-    for (const flow of SUITES[suite]) {
+    for (const flow of flows) {
       console.log(`\n=== ${flow}`);
       results.push(await runFlow(flow));
     }
   } finally {
     // Never leave the gateway stopped if a fault-injection flow failed half-way.
     if (!(await fetch(`${API_URL}/health`).then((r) => r.ok, () => false))) await actions['gateway/start']();
+    // Leave the QA driver as the seed did (free, AVAILABLE) for the next run or the driver suite.
+    if (crossApp) await restoreSeedDriverState().catch((error) => console.error('[cleanup] restoring the QA driver failed:', error.message));
     web.kill();
+    driverWeb?.kill();
     control.close();
   }
 
   console.log(`\nSuite "${suite}" results (artifacts: ${ARTIFACTS})`);
   for (const r of results) console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.flow}  (${r.seconds}s)`);
+  for (const flow of skipped) console.log(`  SKIP  ${flow}  (cross-app; E2E_SKIP_CROSS_APP=1)`);
+  if (skipped.length && process.env.GITHUB_ACTIONS) {
+    console.log(`::warning::${skipped.length} cross-app flow(s) skipped: the driver app was not available to this run.`);
+  }
   const failed = results.filter((r) => !r.ok).length;
-  console.log(`${results.length - failed}/${results.length} flows passed`);
+  console.log(`${results.length - failed}/${results.length} flows passed${skipped.length ? `, ${skipped.length} skipped` : ''}`);
   process.exit(failed ? 1 : 0);
 }
 

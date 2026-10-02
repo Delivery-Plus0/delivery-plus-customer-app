@@ -10,6 +10,11 @@ name: E2E (Maestro)
 #
 # Requires the backend branch in BACKEND_REF to contain docker-compose.e2e.yml and `npm run
 # seed:e2e` (added alongside this workflow; see planning.md → E2E automation).
+#
+# Cross-app flows (regression/order-awaiting-driver, business) drive the real driver app, which lives
+# in a private repo. GITHUB_TOKEN can't read another private repo, so they need the secret
+# DRIVER_APP_READ_TOKEN (fine-grained token: Contents read-only on delivery-plus-driver-app). Without
+# it they are skipped with a warning; smoke on PRs never needs it.
 
 on:
   pull_request:
@@ -37,6 +42,10 @@ env:
   E2E_API_URL: http://localhost:3100
   E2E_MANIFEST: ${{ github.workspace }}/backend/e2e-seed-manifest.json
   SUITE: ${{ github.event_name == 'pull_request' && 'smoke' || inputs.suite || 'all' }}
+  DRIVER_APP_REPOSITORY: ${{ vars.DRIVER_APP_REPOSITORY || 'Yousefa7medmaher/delivery-plus-driver-app' }}
+  DRIVER_APP_REF: ${{ vars.DRIVER_APP_REF || 'dev' }}
+  DRIVER_APP_DIR: ${{ github.workspace }}/driver-app
+  HAS_DRIVER_APP_TOKEN: ${{ secrets.DRIVER_APP_READ_TOKEN != '' }}
 
 jobs:
   maestro-web:
@@ -87,8 +96,24 @@ jobs:
       - name: Install app
         run: npm ci --no-audit --no-fund
 
-      - name: Run Maestro suite
+      - name: Check out driver app (cross-app flows)
+        if: env.SUITE != 'smoke' && env.HAS_DRIVER_APP_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DRIVER_APP_REPOSITORY }}
+          ref: ${{ env.DRIVER_APP_REF }}
+          token: ${{ secrets.DRIVER_APP_READ_TOKEN }}
+          path: driver-app
+
+      - name: Install driver app
+        if: env.SUITE != 'smoke' && env.HAS_DRIVER_APP_TOKEN == 'true'
+        working-directory: driver-app
+        run: npm ci --no-audit --no-fund
+
+      - name: Run Maestro suite (customer app + driver app)
         run: node e2e/scripts/run.mjs --suite "$SUITE" --build --headless
+        env:
+          E2E_SKIP_CROSS_APP: ${{ env.HAS_DRIVER_APP_TOKEN == 'true' && '0' || '1' }}
 
       - name: Collect backend logs
         if: failure()
