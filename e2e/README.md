@@ -34,8 +34,8 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 | Suite | Flows | Runs in CI |
 | --- | --- | --- |
 | `smoke` | login → Home · search → restaurant → menu · add → change quantity → total · cart → checkout → order | every PR |
-| `regression` | ready order shows "Finding a driver" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session | nightly / manual |
-| `business` | full cycle: customer orders in the UI → restaurant prepares/readies → dispatch → driver picks up/starts/delivers → customer sees Delivered + the confirmation notification | nightly / manual |
+| `regression` | ready order waits ("Finding a driver") while no driver is free, then shows "Driver assigned" once one comes online · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session | nightly / manual |
+| `business` | full cycle: customer orders in the UI → restaurant prepares/readies → automatic dispatch (no stand-in) → driver picks up/starts/delivers → customer sees Delivered + the confirmation notification | nightly / manual |
 
 ## Test data (from `npm run seed:e2e`)
 
@@ -49,7 +49,9 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 Password: `E2E_PASSWORD` (test-only default `Qa-Only-Passw0rd!`; the seed refuses non-localhost
 targets unless `E2E_ALLOW_REMOTE=1`). Menu (QA Kitchen): QA Burger $10.00, QA Pasta $12.50, QA Fries
 $4.00, QA Soup (sold out), QA Lemonade $3.00. Seeded orders: S1 delivered, S2 payment declined,
-S3 ready for pickup without a delivery, S4 confirmed for the other customer. Payments always succeed
+S4 confirmed for the other customer. There is no seeded "waiting for a driver" order: with automatic
+dispatch it would be assigned as soon as the driver is free, so the regression flow creates it at runtime
+(`driver/offline` → `scenario/order-ready` → `driver/online`). Payments always succeed
 in the E2E stack (`PAYMENT_SUCCESS_RATE=1`) so UI checkout is deterministic.
 
 ## How flows interact with things the app can't do
@@ -57,9 +59,12 @@ in the E2E stack (`PAYMENT_SUCCESS_RATE=1`) so UI checkout is deterministic.
 `e2e/scripts/run.mjs` hosts a small control server on `:8090`. Flows call it with
 `runScript: ../../scripts/control.js` to:
 
-- act as the **restaurant** (prepare, ready, dispatch) and **driver** (pickup, start, complete)
+- act as the **restaurant** (prepare, ready) and **driver** (offline, online, pickup, start, complete)
   through the real gateway. These are **stand-ins** because no restaurant or driver client exists
-  yet; replace each with a Maestro flow in that client once it exists.
+  yet; replace each with a Maestro flow in that client once it exists. Dispatch is not a stand-in:
+  delivery-service assigns the driver itself on `order.ready_for_pickup`, and the driver stand-in
+  finds its job through `GET /api/deliveries/me/current`, as the driver app will.
+- set up a ready order with no driver free (`scenario/order-ready`).
 - stop/start the E2E gateway container (offline-recovery flow).
 
 Between flows the runner clears `ratelimit:*` keys in the E2E Redis only, so repeated sign-ins

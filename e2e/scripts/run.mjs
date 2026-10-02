@@ -90,6 +90,27 @@ async function latestKitchenOrder(owner, status) {
   return matching[0];
 }
 
+/** The QA driver's active delivery (GET /deliveries/me/current answers 204 → null when none). */
+async function currentDeliveryId(driver) {
+  const current = await api('GET', '/api/deliveries/me/current', driver);
+  if (!current) throw new Error('The QA driver has no active delivery');
+  if (state.orderId && current.orderId !== state.orderId) {
+    throw new Error(`The QA driver is on order ${current.orderId}, expected ${state.orderId}`);
+  }
+  state.deliveryId = current.id;
+  return current.id;
+}
+
+async function waitForOrderStatus(orderId, token, status, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const order = await api('GET', `/api/orders/${orderId}`, token);
+    if (order.status === status) return order;
+    if (Date.now() > deadline) throw new Error(`Order ${orderId} did not reach ${status} (last ${order.status})`);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
 function container(service) {
   return `${PROJECT}-${service}-1`;
 }
@@ -133,32 +154,45 @@ const actions = {
     const owner = await login(manifest.accounts.restaurant.email);
     await api('PATCH', `/api/orders/${state.orderId}/status`, owner, { status: 'READY_FOR_PICKUP' });
   },
-  // Dispatch is a manual owner action today (no auto-dispatch). The QA driver is cycled
-  // offline→online so delivery-service (most recently updated AVAILABLE driver) picks it.
-  'restaurant/dispatch': async () => {
+  // There is no dispatch stand-in: delivery-service dispatches on order.ready_for_pickup by itself.
+
+  // A ready order with no driver free: the QA driver must be offline first (driver/offline).
+  // Placed through the API as the QA customer, then prepared and marked ready by the restaurant.
+  'scenario/order-ready': async () => {
+    const customer = await login(manifest.accounts.customer.email);
     const owner = await login(manifest.accounts.restaurant.email);
-    const driver = await login(manifest.accounts.driver.email);
-    const delivery = await api('POST', '/api/deliveries', owner, { orderId: state.orderId });
-    const me = await api('GET', '/api/drivers/me', driver);
-    if (me.status === 'AVAILABLE') await api('POST', '/api/drivers/me/offline', driver, {});
-    await api('POST', '/api/drivers/me/online', driver, {});
-    const assigned = await api('POST', `/api/deliveries/${delivery.id}/assign`, owner, {});
-    if (assigned.driverId !== manifest.driverId) throw new Error(`Assigned ${assigned.driverId}, expected the QA driver`);
-    state.deliveryId = delivery.id;
+    await api('DELETE', '/api/cart', customer);
+    await api('POST', '/api/cart/items', customer, { menuItemId: manifest.menuItems['QA Pasta'], quantity: 1 });
+    const order = await api('POST', '/api/orders', customer, {});
+    const payment = await api('POST', '/api/payments', customer, { orderId: order.id });
+    await api('POST', `/api/payments/${payment.id}/process`, customer, { simulateFailure: false });
+    await waitForOrderStatus(order.id, customer, 'CONFIRMED');
+    await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'PREPARING' });
+    await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'READY_FOR_PICKUP' });
+    state.orderId = order.id;
+    state.deliveryId = null;
   },
-  // DRIVER stand-in (qa.driver).
+  // DRIVER stand-in (qa.driver). It finds its job the way the driver app will: GET /deliveries/me/current.
+  'driver/offline': async () => {
+    const driver = await login(manifest.accounts.driver.email);
+    await api('POST', '/api/drivers/me/offline', driver, {});
+  },
+  'driver/online': async () => {
+    const driver = await login(manifest.accounts.driver.email);
+    await api('POST', '/api/drivers/me/online', driver, {});
+  },
   'driver/pickup': async () => {
     const driver = await login(manifest.accounts.driver.email);
     await api('POST', '/api/tracking/location', driver, { latitude: 30.0444, longitude: 31.2357 });
-    await api('POST', `/api/deliveries/${state.deliveryId}/pickup`, driver, {});
+    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/pickup`, driver, {});
   },
   'driver/start': async () => {
     const driver = await login(manifest.accounts.driver.email);
-    await api('POST', `/api/deliveries/${state.deliveryId}/start`, driver, {});
+    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/start`, driver, {});
   },
   'driver/complete': async () => {
     const driver = await login(manifest.accounts.driver.email);
-    await api('POST', `/api/deliveries/${state.deliveryId}/complete`, driver, {});
+    await api('POST', `/api/deliveries/${await currentDeliveryId(driver)}/complete`, driver, {});
   },
   // Fault injection for the offline-recovery flow.
   'gateway/stop': async () => {
@@ -211,7 +245,6 @@ function runFlow(flow) {
     CONTROL_URL,
     EMAIL: manifest.accounts.customer.email,
     PASSWORD: manifest.password,
-    AWAITING_ORDER_ID: manifest.orders.awaitingDriver,
     FAILED_ORDER_ID: manifest.orders.failed,
     OTHER_ORDER_ID: manifest.orders.otherCustomer,
   };

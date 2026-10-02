@@ -42,23 +42,11 @@ tags:
     file: ../../scripts/control.js
     env:
       ACTION: restaurant/ready
-# Customer app polls order detail every 10s.
-- extendedWaitUntil:
-    visible:
-      id: order-status
-      text: Ready for pickup
-    timeout: 30000
-- extendedWaitUntil:
-    visible:
-      id: delivery-stage
-      text: Finding a driver
-    timeout: 30000
 
-# DISPATCH (manual today: no auto-dispatch) + DRIVER (stand-in: no driver client exists yet).
-- runScript:
-    file: ../../scripts/control.js
-    env:
-      ACTION: restaurant/dispatch
+# DISPATCH is automatic: delivery-service consumes order.ready_for_pickup and assigns the QA driver
+# within about a second, so the app (polling every 10s) goes straight to "Driver assigned". The
+# "Finding a driver" state is covered by regression/order-awaiting-driver.yaml.
+# DRIVER: stand-in (no driver client exists yet); it finds its job via GET /deliveries/me/current.
 - extendedWaitUntil:
     visible:
       id: delivery-stage
