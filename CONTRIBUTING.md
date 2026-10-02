@@ -30,4 +30,4 @@ Open pull requests against `dev` and use the pull request template. Describe the
 
 Use clear imperative commit subjects, such as `fix(checkout): keep the cart when payment fails`.
 
-Branches: `dev` (default; integration), `testing` (protected; release candidates), `main` (released).
+Branches: `dev` (default; integration), `testing` (release candidates), `main` (released).
