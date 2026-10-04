@@ -58,10 +58,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check out backend
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.BACKEND_REPOSITORY }}
           ref: ${{ env.BACKEND_REF }}
@@ -103,7 +103,7 @@ jobs:
 
       - name: Check out driver app (cross-app flows)
         if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.DRIVER_APP_REPOSITORY }}
           ref: ${{ env.DRIVER_APP_REF }}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Check out restaurant app (cross-app flows)
         if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.RESTAURANT_APP_REPOSITORY }}
           ref: ${{ env.RESTAURANT_APP_REF }}
