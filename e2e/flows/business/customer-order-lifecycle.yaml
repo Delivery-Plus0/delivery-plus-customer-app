@@ -1,12 +1,12 @@
 url: ${APP_URL}
-name: Full cycle across both apps - customer orders, restaurant readies, automatic dispatch, the driver app delivers, customer sees Delivered
+name: Full cycle across all three apps - customer orders, the restaurant app readies it, automatic dispatch, the driver app delivers, customer sees Delivered
 tags:
   - business
   - cross-app
 ---
-# Two real UIs in one browser: the customer app (${APP_URL}) and the driver app (${DRIVER_APP_URL}).
-# Only the restaurant is still an API stand-in (no restaurant client yet). Dispatch is the backend's
-# own automatic dispatch; nothing in this flow creates or assigns a delivery.
+# Three real UIs in one browser: the customer app (${APP_URL}), the restaurant app
+# (${RESTAURANT_APP_URL}) and the driver app (${DRIVER_APP_URL}). No API stand-ins: dispatch is the
+# backend's own automatic dispatch; nothing in this flow creates, prepares or assigns anything by API.
 
 # CUSTOMER APP: sign in first (login.yaml starts from a clean browser state).
 - runFlow: ../_shared/login.yaml
@@ -48,15 +48,33 @@ tags:
       text: Confirmed
     timeout: 20000
 
-# RESTAURANT (stand-in: the runner acts as qa.restaurant through the real API).
+# Read-only: the id of the order just placed (so the other apps' cards can be addressed by it).
 - runScript:
     file: ../../scripts/control.js
     env:
-      ACTION: restaurant/prepare
-- runScript:
-    file: ../../scripts/control.js
-    env:
-      ACTION: restaurant/ready
+      ACTION: order/placed
+
+# RESTAURANT APP (real UI): the new paid order is on the kitchen board; start preparing, then ready.
+- runFlow: ../_shared/restaurant-app-sign-in.yaml
+- extendedWaitUntil:
+    visible:
+      id: order-${output.control.orderId}-start-preparing
+    timeout: 30000
+- assertVisible: '.*QA Burger'
+- tapOn:
+    id: order-${output.control.orderId}-start-preparing
+- extendedWaitUntil:
+    visible:
+      id: order-${output.control.orderId}-status
+      text: In kitchen
+    timeout: 15000
+- tapOn:
+    id: order-${output.control.orderId}-ready-for-pickup
+- extendedWaitUntil:
+    visible:
+      id: order-${output.control.orderId}-status
+      text: Ready for pickup
+    timeout: 15000
 
 # AUTOMATIC DISPATCH: delivery-service consumed order.ready_for_pickup and created the delivery; with
 # no driver online it waits.
