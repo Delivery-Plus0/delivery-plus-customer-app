@@ -1,0 +1,33 @@
+# Shared (cross-app): open the real restaurant app (${RESTAURANT_APP_URL}, the restaurant repo's web
+# build served by the runner) in the same browser and sign in as the QA restaurant owner. Each app keeps
+# its own session (separate origins), so the flow can switch between them with openLink.
+url: ${RESTAURANT_APP_URL}/login
+---
+- openLink: ${RESTAURANT_APP_URL}/login
+- extendedWaitUntil:
+    visible:
+      id: login-email
+    timeout: 20000
+- tapOn:
+    id: login-email
+- inputText: ${RESTAURANT_EMAIL}
+- tapOn:
+    id: login-password
+- inputText: ${PASSWORD}
+- tapOn:
+    id: login-submit
+- extendedWaitUntil:
+    visible:
+      id: restaurant-heading
+    timeout: 20000
+# The QA owner also owns QA Night Cafe (closed); work on QA Kitchen (${RESTAURANT_ID}).
+- runFlow:
+    when:
+      visible:
+        id: restaurant-select-${RESTAURANT_ID}
+    commands:
+      - tapOn:
+          id: restaurant-select-${RESTAURANT_ID}
+- extendedWaitUntil:
+    visible: 'QA Kitchen'
+    timeout: 10000

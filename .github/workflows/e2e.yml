@@ -6,15 +6,17 @@ name: E2E (Maestro)
 #
 # - Pull requests run the smoke suite (critical customer path, ~4 min of flows).
 # - A nightly schedule and manual runs execute everything: smoke + regression (failure paths,
-#   authorization, offline recovery) + the cross-application business cycle.
+#   authorization, offline recovery) + the business cycle across the customer, restaurant and driver
+#   apps.
 #
 # Requires the backend branch in BACKEND_REF to contain docker-compose.e2e.yml and `npm run
 # seed:e2e` (added alongside this workflow; see planning.md → E2E automation).
 #
-# Cross-app flows (regression/order-awaiting-driver, business) drive the real driver app, which lives
-# in a private repo. GITHUB_TOKEN can't read another private repo, so they need the secret
-# DRIVER_APP_READ_TOKEN (fine-grained token: Contents read-only on delivery-plus-driver-app). Without
-# it they are skipped with a warning; smoke on PRs never needs it.
+# Cross-app flows drive the real driver app (regression/order-awaiting-driver, business) and the real
+# restaurant app (business). Both live in private repos, which GITHUB_TOKEN can't read, so they need
+# the secret CLIENT_APPS_READ_TOKEN (fine-grained token: Contents read-only on
+# delivery-plus-driver-app and delivery-plus-restaurant-app). Without it they are skipped with a
+# warning; smoke on PRs never needs it.
 
 on:
   pull_request:
@@ -45,7 +47,10 @@ env:
   DRIVER_APP_REPOSITORY: ${{ vars.DRIVER_APP_REPOSITORY || 'Yousefa7medmaher/delivery-plus-driver-app' }}
   DRIVER_APP_REF: ${{ vars.DRIVER_APP_REF || 'dev' }}
   DRIVER_APP_DIR: ${{ github.workspace }}/driver-app
-  HAS_DRIVER_APP_TOKEN: ${{ secrets.DRIVER_APP_READ_TOKEN != '' }}
+  RESTAURANT_APP_REPOSITORY: ${{ vars.RESTAURANT_APP_REPOSITORY || 'Yousefa7medmaher/delivery-plus-restaurant-app' }}
+  RESTAURANT_APP_REF: ${{ vars.RESTAURANT_APP_REF || 'dev' }}
+  RESTAURANT_APP_DIR: ${{ github.workspace }}/restaurant-app
+  HAS_CLIENT_APPS_TOKEN: ${{ secrets.CLIENT_APPS_READ_TOKEN != '' }}
 
 jobs:
   maestro-web:
@@ -97,23 +102,33 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check out driver app (cross-app flows)
-        if: env.SUITE != 'smoke' && env.HAS_DRIVER_APP_TOKEN == 'true'
+        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.DRIVER_APP_REPOSITORY }}
           ref: ${{ env.DRIVER_APP_REF }}
-          token: ${{ secrets.DRIVER_APP_READ_TOKEN }}
+          token: ${{ secrets.CLIENT_APPS_READ_TOKEN }}
           path: driver-app
 
-      - name: Install driver app
-        if: env.SUITE != 'smoke' && env.HAS_DRIVER_APP_TOKEN == 'true'
-        working-directory: driver-app
-        run: npm ci --no-audit --no-fund
+      - name: Check out restaurant app (cross-app flows)
+        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.RESTAURANT_APP_REPOSITORY }}
+          ref: ${{ env.RESTAURANT_APP_REF }}
+          token: ${{ secrets.CLIENT_APPS_READ_TOKEN }}
+          path: restaurant-app
 
-      - name: Run Maestro suite (customer app + driver app)
+      - name: Install driver and restaurant apps
+        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
+        run: |
+          (cd driver-app && npm ci --no-audit --no-fund)
+          (cd restaurant-app && npm ci --no-audit --no-fund)
+
+      - name: Run Maestro suite (customer app + restaurant app + driver app)
         run: node e2e/scripts/run.mjs --suite "$SUITE" --build --headless
         env:
-          E2E_SKIP_CROSS_APP: ${{ env.HAS_DRIVER_APP_TOKEN == 'true' && '0' || '1' }}
+          E2E_SKIP_CROSS_APP: ${{ env.HAS_CLIENT_APPS_TOKEN == 'true' && '0' || '1' }}
 
       - name: Collect backend logs
         if: failure()

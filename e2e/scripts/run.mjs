@@ -8,7 +8,9 @@
 //      E2E_MANIFEST (../delivery-plus/e2e-seed-manifest.json), MAESTRO_BIN (maestro),
 //      E2E_COMPOSE_PROJECT (delivery-plus-e2e),
 //      DRIVER_APP_DIR (../delivery-plus-driver-app; the driver app for the cross-app flows),
-//      E2E_DRIVER_WEB_PORT (8084), E2E_SKIP_CROSS_APP (1 = skip cross-app flows, e.g. CI without
+//      E2E_DRIVER_WEB_PORT (8084), RESTAURANT_APP_DIR (../delivery-plus-restaurant-app; the
+//      restaurant app for the business flow), E2E_RESTAURANT_WEB_PORT (8085),
+//      E2E_SKIP_CROSS_APP (1 = skip cross-app flows, e.g. CI without
 //      access to the driver repo)
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -46,7 +48,13 @@ const DRIVER_WEB_PORT = Number(process.env.E2E_DRIVER_WEB_PORT ?? 8084);
 const DRIVER_APP_URL = `http://localhost:${DRIVER_WEB_PORT}`;
 const DRIVER_WEB_BUILD = join(E2E_DIR, '.driver-web-build');
 const DRIVER_FIXED_LOCATION = { latitude: 30.0444, longitude: 31.2357 };
+// The real restaurant app (separate repo) runs the kitchen steps of the business flow, served on :8085.
+const RESTAURANT_APP_DIR = resolve(process.env.RESTAURANT_APP_DIR ?? join(APP_DIR, '..', 'delivery-plus-restaurant-app'));
+const RESTAURANT_WEB_PORT = Number(process.env.E2E_RESTAURANT_WEB_PORT ?? 8085);
+const RESTAURANT_APP_URL = `http://localhost:${RESTAURANT_WEB_PORT}`;
+const RESTAURANT_WEB_BUILD = join(E2E_DIR, '.restaurant-web-build');
 const CROSS_APP_FLOWS = new Set(['regression/order-awaiting-driver.yaml', 'business/customer-order-lifecycle.yaml']);
+const RESTAURANT_FLOWS = new Set(['business/customer-order-lifecycle.yaml']);
 const SKIP_CROSS_APP = process.env.E2E_SKIP_CROSS_APP === '1';
 
 const SUITES = {
@@ -92,16 +100,22 @@ async function login(email) {
   return (await api('POST', '/api/auth/login', null, { email, password: manifest.password })).accessToken;
 }
 
-// The order the current flow is about (set by the restaurant stand-in / scenario).
+// The order the current flow is about (set by order/placed or a scenario).
 const state = { orderId: null };
 
-async function latestKitchenOrder(owner, status) {
-  const restaurantId = manifest.restaurants['QA Kitchen'];
-  const { items } = await api('GET', `/api/orders/restaurant/${restaurantId}?limit=50`, owner);
-  const matching = items.filter((order) => order.status === status);
-  matching.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  if (!matching[0]) throw new Error(`No ${status} order at QA Kitchen`);
-  return matching[0];
+/**
+ * Fixture (before each flow that uses the restaurant app): the kitchen board starts with only the
+ * seeded orders. Kitchen orders left CONFIRMED/PREPARING by earlier flows (e.g. the checkout smoke)
+ * are cancelled as the owner, so the flow's order is never pushed below the fold (Maestro web can't
+ * scroll react-native-web lists). Seeded orders are never touched.
+ */
+async function cancelStrayKitchenOrders() {
+  const owner = await login(manifest.accounts.restaurant.email);
+  const seeded = new Set(Object.values(manifest.orders));
+  const { items } = await api('GET', `/api/orders/restaurant/${manifest.restaurants['QA Kitchen']}?limit=100`, owner);
+  const stray = items.filter((order) => ['CONFIRMED', 'PREPARING'].includes(order.status) && !seeded.has(order.id));
+  for (const order of stray) await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'CANCELLED' });
+  if (stray.length) console.log(`[fixture] cancelled ${stray.length} leftover kitchen order(s)`);
 }
 
 async function waitForOrderStatus(orderId, token, status, timeoutMs = 20_000) {
@@ -189,22 +203,22 @@ async function waitForGateway(up, timeoutMs = 90_000) {
 }
 
 const actions = {
-  // RESTAURANT stand-in (qa.restaurant): accept/prepare the newest confirmed order, then mark it ready.
-  'restaurant/prepare': async () => {
-    const owner = await login(manifest.accounts.restaurant.email);
-    const order = await latestKitchenOrder(owner, 'CONFIRMED');
-    state.orderId = order.id;
-    await api('PATCH', `/api/orders/${order.id}/status`, owner, { status: 'PREPARING' });
+  // Read-only, as the customer: the order just placed in the customer app (newest of theirs, CONFIRMED),
+  // so the other apps' cards can be addressed by its id. Changes nothing.
+  'order/placed': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    const { items } = await api('GET', '/api/orders', customer);
+    const newest = [...items].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+    if (!newest) throw new Error('The QA customer has no orders');
+    await waitForOrderStatus(newest.id, customer, 'CONFIRMED');
+    state.orderId = newest.id;
   },
-  'restaurant/ready': async () => {
-    const owner = await login(manifest.accounts.restaurant.email);
-    await api('PATCH', `/api/orders/${state.orderId}/status`, owner, { status: 'READY_FOR_PICKUP' });
-  },
-  // There is no dispatch stand-in: delivery-service dispatches on order.ready_for_pickup by itself.
-  // There is no driver stand-in either: flows drive the QA driver through the real driver app.
+  // No restaurant, dispatch or driver stand-ins in the business flow: the kitchen steps run in the
+  // restaurant app, delivery-service dispatches on order.ready_for_pickup by itself, and the driver
+  // works in the driver app.
 
-  // A ready order with no driver free: the QA driver must be offline first (in the driver app).
-  // Placed through the API as the QA customer, then prepared and marked ready by the restaurant.
+  // Regression set-up only: a ready order with no driver free (the QA driver goes offline first, in the
+  // driver app). Placed through the API as the QA customer, then prepared and marked ready as the owner.
   'scenario/order-ready': async () => {
     const customer = await login(manifest.accounts.customer.email);
     const owner = await login(manifest.accounts.restaurant.email);
@@ -293,6 +307,14 @@ function buildDriverWeb() {
   });
 }
 
+function buildRestaurantWeb() {
+  if (!existsSync(join(RESTAURANT_APP_DIR, 'package.json'))) {
+    console.error(`Restaurant app not found at ${RESTAURANT_APP_DIR}. Clone delivery-plus-restaurant-app next to this repo (npm ci), set RESTAURANT_APP_DIR, or set E2E_SKIP_CROSS_APP=1.`);
+    process.exit(2);
+  }
+  buildWeb(RESTAURANT_APP_DIR, RESTAURANT_WEB_BUILD);
+}
+
 /**
  * Maestro must run asynchronously: flows call back into this process's control server, so a
  * spawnSync here would block the event loop and deadlock the first runScript step.
@@ -306,6 +328,9 @@ function runFlow(flow) {
     CONTROL_URL,
     DRIVER_APP_URL,
     DRIVER_EMAIL: manifest.accounts.driver.email,
+    RESTAURANT_APP_URL,
+    RESTAURANT_EMAIL: manifest.accounts.restaurant.email,
+    RESTAURANT_ID: manifest.restaurants['QA Kitchen'],
     EMAIL: manifest.accounts.customer.email,
     PASSWORD: manifest.password,
     FAILED_ORDER_ID: manifest.orders.failed,
@@ -341,9 +366,11 @@ async function main() {
   const flows = SUITES[suite].filter((flow) => !(SKIP_CROSS_APP && CROSS_APP_FLOWS.has(flow)));
   const skipped = SUITES[suite].filter((flow) => !flows.includes(flow));
   const crossApp = flows.some((flow) => CROSS_APP_FLOWS.has(flow));
+  const withRestaurant = flows.some((flow) => RESTAURANT_FLOWS.has(flow));
 
   if (flag('build') || !existsSync(join(WEB_BUILD, 'index.html'))) buildWeb();
   if (crossApp && (flag('build') || !existsSync(join(DRIVER_WEB_BUILD, 'index.html')))) buildDriverWeb();
+  if (withRestaurant && (flag('build') || !existsSync(join(RESTAURANT_WEB_BUILD, 'index.html')))) buildRestaurantWeb();
   mkdirSync(ARTIFACTS, { recursive: true });
 
   await fetch(`${API_URL}/health`).then(
@@ -354,6 +381,7 @@ async function main() {
   const serve = (dir, port) => spawn(process.execPath, [join(E2E_DIR, 'scripts', 'serve-web.mjs'), dir, String(port)], { stdio: 'inherit' });
   const web = serve(WEB_BUILD, WEB_PORT);
   const driverWeb = crossApp ? serve(DRIVER_WEB_BUILD, DRIVER_WEB_PORT) : null;
+  const restaurantWeb = withRestaurant ? serve(RESTAURANT_WEB_BUILD, RESTAURANT_WEB_PORT) : null;
   await new Promise((r) => control.listen(CONTROL_PORT, '127.0.0.1', r));
   await new Promise((r) => setTimeout(r, 500));
 
@@ -365,6 +393,7 @@ async function main() {
   try {
     for (const flow of flows) {
       console.log(`\n=== ${flow}`);
+      if (RESTAURANT_FLOWS.has(flow)) await cancelStrayKitchenOrders();
       results.push(await runFlow(flow));
     }
   } finally {
@@ -374,6 +403,7 @@ async function main() {
     if (crossApp) await restoreSeedDriverState().catch((error) => console.error('[cleanup] restoring the QA driver failed:', error.message));
     web.kill();
     driverWeb?.kill();
+    restaurantWeb?.kill();
     control.close();
   }
 
@@ -381,7 +411,7 @@ async function main() {
   for (const r of results) console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.flow}  (${r.seconds}s)`);
   for (const flow of skipped) console.log(`  SKIP  ${flow}  (cross-app; E2E_SKIP_CROSS_APP=1)`);
   if (skipped.length && process.env.GITHUB_ACTIONS) {
-    console.log(`::warning::${skipped.length} cross-app flow(s) skipped: the driver app was not available to this run.`);
+    console.log(`::warning::${skipped.length} cross-app flow(s) skipped: the driver/restaurant apps were not available to this run.`);
   }
   const failed = results.filter((r) => !r.ok).length;
   console.log(`${results.length - failed}/${results.length} flows passed${skipped.length ? `, ${skipped.length} skipped` : ''}`);
