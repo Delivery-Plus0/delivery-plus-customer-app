@@ -10,6 +10,19 @@ import type { DeliveryStatus } from '@/services/deliveries';
  */
 export type TrackingState = 'NO_DRIVER' | 'AWAITING_LOCATION' | 'LIVE' | 'STALE' | 'ENDED';
 
+/** ETA as tracking-service derives it (#46). Anything but ESTIMATED means "no ETA". */
+export type DeliveryEta =
+  | { status: 'UNAVAILABLE'; reason: string }
+  | {
+      status: 'ESTIMATED';
+      seconds: number;
+      driverId: string;
+      assignedAt: string | null;
+      basedOnLocationAt: string;
+      computedAt: string;
+      validUntil: string;
+    };
+
 export type DriverPosition = {
   latitude: number;
   longitude: number;
@@ -24,6 +37,10 @@ export type DeliveryTracking = {
   location: DriverPosition | null;
   tracking: TrackingState;
   locationAgeSeconds: number | null;
+  /** Assignment contract (backend #46): who is assigned and when; null without a driver. */
+  assignment?: { driverId: string; assignedAt: string | null } | null;
+  /** ETA contract (backend #46): only ESTIMATED may be shown, and only until validUntil. */
+  eta?: DeliveryEta;
   /** Client-only: when this device received the snapshot (ms epoch), to age the position locally. */
   receivedAt?: number;
 };

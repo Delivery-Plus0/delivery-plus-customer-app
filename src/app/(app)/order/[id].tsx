@@ -2,9 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { DeliveryCard } from '@/components/delivery-card';
+import { DriverCard } from '@/components/driver-card';
 import { DriverLocationCard } from '@/components/driver-location-card';
-import { OrderStatusBadge, OrderTimeline } from '@/components/order-status';
+import { OrderPhaseCard } from '@/components/order-phase-card';
+import { OrderStatusBadge } from '@/components/order-status';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
@@ -15,16 +16,22 @@ import { ErrorState } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
 import { CUSTOMER_CANCELLABLE_STATUSES, isActiveOrder } from '@/services/orders';
 import { useRestaurant } from '@/state/catalog';
-import { canHaveDelivery, isDeliveryActive, useOrderDelivery } from '@/state/deliveries';
+import { useNow } from '@/hooks/use-now';
+import { canHaveDelivery, useOrderDelivery } from '@/state/deliveries';
 import { cancelMyOrder, useOrder } from '@/state/orders';
+import { useDeliveryTracking } from '@/state/tracking';
 import { confirm } from '@/utils/confirm';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
+import { describeOrderPhase, searchingFor } from '@/utils/order-phase';
 
 export default function OrderDetailScreen() {
   const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
   const order = useOrder(id);
   const restaurant = useRestaurant(order.data?.restaurantId);
   const delivery = useOrderDelivery(order.data);
+  // One tracking source for the whole screen (one realtime stream), shared by the map and the ETA.
+  const tracking = useDeliveryTracking(delivery.data);
+  const now = useNow(15_000);
   const [cancelling, setCancelling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -52,6 +59,16 @@ export default function OrderDetailScreen() {
   const current = order.data;
   const canCancel = CUSTOMER_CANCELLABLE_STATUSES.includes(current.status);
   const live = isActiveOrder(current);
+  const phase = describeOrderPhase(current, delivery.data);
+  const eta = tracking.data?.eta;
+  const etaNote =
+    eta?.status === 'ESTIMATED' && now <= Date.parse(eta.validUntil)
+      ? `Arriving in about ${Math.max(1, Math.round(eta.seconds / 60))} min`
+      : null;
+  const phaseNote = phase.key === 'searching' ? searchingFor(delivery.data?.createdAt, now) : etaNote;
+  const driver = delivery.data?.driver;
+  const showDriver = !!driver && phase.key !== 'failed' && phase.key !== 'cancelled';
+  const deliveryUnavailable = canHaveDelivery(current) && delivery.data === undefined && !!delivery.error;
 
   const handleCancel = async () => {
     const ok = await confirm({
@@ -102,10 +119,29 @@ export default function OrderDetailScreen() {
         {placed && live ? <InlineAlert testID="order-placed" tone="success" message="Order placed! We'll keep this page updated." /> : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
 
+        <OrderPhaseCard phase={phase} note={phaseNote} />
+
+        {deliveryUnavailable ? (
+          <InlineAlert
+            testID="delivery-unavailable"
+            message="We couldn't load the delivery status. Pull down to try again."
+          />
+        ) : null}
+
+        {showDriver && driver ? <DriverCard driver={driver} /> : null}
+
+        {live ? <DriverLocationCard tracking={tracking} /> : null}
+
+        {canCancel ? (
+          <ThemedText type="caption" themeColor="textSecondary" testID="order-cancel-hint">
+            You can cancel until the restaurant starts preparing your order.
+          </ThemedText>
+        ) : null}
+
         <Card>
           <View style={styles.rowBetween}>
             <View style={styles.flex}>
-              <ThemedText type="heading" numberOfLines={1}>
+              <ThemedText type="defaultBold" numberOfLines={1}>
                 {restaurant.data?.name ?? 'Your order'}
               </ThemedText>
               <ThemedText type="caption" themeColor="textSecondary">
@@ -114,27 +150,7 @@ export default function OrderDetailScreen() {
             </View>
             <OrderStatusBadge status={current.status} testID="order-status" />
           </View>
-          <View style={styles.timeline}>
-            <OrderTimeline status={current.status} />
-          </View>
-          {live ? (
-            <ThemedText type="caption" themeColor="textSecondary">
-              Updates automatically while this screen is open.
-            </ThemedText>
-          ) : null}
         </Card>
-
-        {canHaveDelivery(current) && !(delivery.data === null && !live) ? (
-          <DeliveryCard
-            delivery={delivery.data}
-            isLoading={delivery.isLoading}
-            error={delivery.error}
-            live={live && isDeliveryActive(delivery.data)}
-            onRetry={() => void delivery.refresh()}
-          />
-        ) : null}
-
-        {live ? <DriverLocationCard delivery={delivery.data} /> : null}
 
         <Card>
           <ThemedText type="heading">Items</ThemedText>
@@ -183,9 +199,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.three,
-  },
-  timeline: {
-    marginTop: Spacing.two,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

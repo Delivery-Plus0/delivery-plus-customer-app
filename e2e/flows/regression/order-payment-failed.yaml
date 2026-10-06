@@ -11,8 +11,12 @@ tags:
       id: order-status
       text: Failed
     timeout: 20000
-- assertVisible: This order could not be completed\.
+- assertVisible:
+    id: order-phase
+    text: Payment failed
+- assertVisible: This order could not be completed and you were not charged\.
+# No delivery, so no driver.
 - assertNotVisible:
-    id: delivery-card
+    id: driver-card
 - assertNotVisible:
     id: order-cancel

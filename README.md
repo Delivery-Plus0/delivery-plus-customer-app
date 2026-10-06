@@ -11,7 +11,7 @@ Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs 
 | Account | Sign up, sign in (one request per submit, actionable errors), profile with avatar and delivery address |
 | Browse | Restaurant list and search, restaurant page with menu |
 | Cart and checkout | One-restaurant cart, quantity changes, checkout with order + payment (idempotency keys, so retries never double-charge) |
-| Orders | Order history and detail, live status and delivery stages (polling every 10 s while active), cancel while allowed |
+| Orders | Order history, and a **live order screen** led by the current phase: placed → preparing → **finding a driver** (with how long it has been searching) → driver assigned (driver card: first name, photo, vehicle, plate) → picked up → on the way → delivered. Cancel while allowed, with the rule shown |
 | Driver on the map | While a delivery is in progress the order screen shows a street map with the driver's pin, labelled **Live** or **Last known location**, updated in real time with polling as fallback (see below) |
 | Notifications | In-app notifications with an unread badge, one per order stage |
 
