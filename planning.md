@@ -14,7 +14,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 
 ## 1. Where the project is now
 
-**Overall: an order goes from checkout to the customer's door through three real apps and no API stand-ins. The customer orders, the restaurant app prepares and readies it, the backend dispatches it automatically, and the driver app picks it up and delivers it. The customer gets a notification at every stage. Events are published through a transactional outbox. Next is Phase 7: real-time tracking.**
+**Overall: an order goes from checkout to the customer's door through three real apps and no API stand-ins. The customer orders, the restaurant app prepares and readies it, the backend dispatches it automatically, and the driver app picks it up and delivers it. The customer gets a notification at every stage and follows the driver on a live map (Server-Sent Events, with polling as fallback). Events are published through a transactional outbox. Phase 7 (real-time tracking) is complete.**
 
 | Phase | State |
 | --- | --- |
@@ -25,7 +25,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 | 4 · Driver + restaurant clients | ✅ complete: driver app #99 (driver #15, #16; customer #19), restaurant app #100 (restaurant #6, #7) |
 | 5 · Full business flow E2E | ✅ locally: the customer business flow drives the real restaurant and driver apps (customer #20). ⚠️ On GitHub the cross-app flows need the `CLIENT_APPS_READ_TOKEN` secret (#13) |
 | 6 · Notifications + push | ✅ core: a notification for every customer-visible stage (#5, backend #129). Open: failed/cancelled-payment notifications, retries (#50), templates/preferences (#51), push |
-| 7 · Real-time tracking | 📋 **next**: the driver app sends locations; the customer app polls every 10 s and has no map |
+| 7 · Real-time tracking | ✅ complete:<ul><li>lifecycle (#32)</li><li>customer map (#132)</li><li>realtime SSE with polling fallback (#134)</li><li>assignment + ETA contracts (#46)</li><li>location trust boundaries (#60)</li></ul> |
 | 8 · Customer product features | 📋 backlog |
 | 9 · Production readiness | ⚠️ mostly missing: no metrics, no deploy pipeline, no backups, no graceful shutdown |
 
@@ -50,10 +50,16 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
   - Maestro 3/3.
 - **Notifications (#5, backend #129):** payment received, order confirmed, driver assigned, picked up and delivered. The business flow asserts all five on Alerts (customer #22).
 - **Kafka outbox (#98):** order and delivery events are published if and only if their change committed. Drivers left BUSY after a finished delivery are released by a sweep (#127).
+- **Driver tracking (Phase 7):**
+  - **Map:** the order screen shows the driver's pin on a street map, labelled "Live" or "Last known location". It shows nothing before a position exists and nothing after delivery or cancellation (#32, #132).
+  - **Realtime:** updates are pushed over Server-Sent Events, with 10 s polling only while the stream is down, and the screen never says "Live" for disconnected data (#134).
+  - **Contracts:** each tracking read carries the assignment and a derived, never-stored ETA (#46).
+  - **Trust:** driver locations are untrusted claims, bound to the active delivery, with replays rejected (#60).
 - **Docs:** the engineering library (`docs/books`, #106) and the project context were updated with each PR.
 
 **What is missing or wrong (verified):**
-- **The customer app shows no driver location yet** (Phase 7): the driver app sends it (#99 step 6) and the customer's tracking endpoint returns it, but there is no map or pin in the UI.
+- **No ETA is shown yet:** the contract exists (#46), but no routing provider is configured and orders carry no drop-off coordinates.
+- **Only driver tracking is realtime:** other screens still poll.
 - **Cross-app flows don't run on GitHub yet:** they need the `CLIENT_APPS_READ_TOKEN` secret (read access to the driver and restaurant repos), which is an owner action.
 - **Driver choice is basic:** "most recently updated AVAILABLE driver", with no location, distance or fairness (F11).
 - **Notifications:** none for a failed or cancelled payment, no retries/templates (#50, #51), no push.
@@ -61,7 +67,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 - **Open review findings F3–F11 (§9):** error-message leak on 500, superuser DB access and root image, ADMIN system tokens on a shared secret, cart lost update, non-atomic rate limiter, TypeORM `undefined`-where trap, correlation ids.
 - **App repos are private on the free plan:** branch protection/rulesets and CodeQL are unavailable there, so merges rely on the "all CI green" policy, not enforcement.
 
-**The plan, in one line:** Phase 7 real-time tracking (customer location UI, then SSE/WebSocket) → the Phase 6 remainder → Phase 8 customer features. Production readiness runs alongside. Details are in §5 and §6.
+**The plan, in one line:** Phase 7 is closed. Next comes the product backlog (the Phase 6 remainder, Phase 8 customer features), with production readiness (Phase 9) alongside. Details are in §5 and §6.
 
 ---
 
@@ -150,7 +156,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 
 ## 5. Current sprint
 
-**Now: Phase 7 · real-time tracking** (#32, #132, #134, then #46, #60):
+**Phase 7 · real-time tracking: ✅ complete** (#32, #132, #134, #46, #60):
 1. ✅ **Step 1, tracking lifecycle (#32):** backend #131 and customer #24.
    - The tracking endpoint returns one explicit state: `NO_DRIVER`, `AWAITING_LOCATION`, `LIVE`, `STALE` (over 60 s old) or `ENDED` (no position after delivery or cancellation).
    - The order screen shows a status card.
@@ -159,7 +165,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
    - Text-only states for no driver and waiting for location; nothing once ended.
    - The map is OpenStreetMap tiles via `expo-image`, with no new dependency.
    - Authorization: another customer gets 403 (API e2e) and no card appears (Maestro).
-3. 🔄 **Step 3, realtime (#134):** backend #135 and customer #136.
+3. ✅ **Step 3, realtime (#134):** backend #137 and customer #26 (sub-issues #135, #136).
    - **Transport:** Server-Sent Events, chosen over WebSocket. It keeps the normal auth header and the HTTP gateway as-is, needs no new dependency, and the updates only go one way.
    - **Backend:** `GET /tracking/delivery/:id/stream`.
      - Driver reports and `delivery.events` trigger recomputes through Redis pub/sub.
@@ -170,7 +176,18 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
      - Never says "Live" for disconnected data.
      - Shows a caption: Live updates / Reconnecting… / Updating every 10 s.
    - **Scope:** only customer delivery tracking is realtime.
-4. **Then #46 and #60:** ETA and geofence trust boundaries.
+4. ✅ **#46, assignment + ETA contracts:** backend #138.
+   - **Assignment:** `assignedAt` is recorded with the assignment and carried in events, `me/current` and every tracking read.
+   - **ETA:** derived on every read and never stored. One gate (ended, no driver, no position, stale, estimator) applies, and an ETA is valid only until its position basis goes stale and only for the same assignment.
+   - **No ETA shown yet:** no routing provider is configured, so the ETA reads `UNAVAILABLE` with reason `NOT_ESTIMATED`.
+5. ✅ **#60, location trust boundaries:** backend #139, driver #21.
+   - **Reports are claims:** bound to the driver's active delivery server-side (409 without one).
+   - **Reads:** only positions from the same delivery are used.
+   - **Client time:** `recordedAt` can only reject a report (422: future, too old, replayed).
+   - **No derived fields from clients:** client ETA/geofence fields get 400.
+   - **No location-driven state:** location never drives delivery state.
+
+**Next sprint:** not started. The product backlog (Phase 6 remainder, Phase 8) and production readiness (Phase 9) are next, after the owner action `CLIENT_APPS_READ_TOKEN`.
 
 Every step ships with unit tests and a Maestro assertion in the cross-app business flow.
 
@@ -231,7 +248,7 @@ flowchart LR
 | Phase 4 · Driver + restaurant clients | ✅ complete (milestone closed) | — (#99, #100 closed) | Met: both apps ship with `testID`s, a Maestro suite and CI from the first commit |
 | Phase 5 · Full business flow E2E | ✅ locally (no stand-ins, customer #20); per-stage notification assertions (customer #22) | #13 (cross-app flows in GitHub CI: needs `CLIENT_APPS_READ_TOKEN`) | The business flow runs through three real UIs in CI |
 | Phase 6 · Notifications + push | ✅ core (#5 via backend #129) | #50, #51 | A notification for every customer-visible stage (met); resilient delivery; push on mobile |
-| Phase 7 · Real-time tracking | **Next** | #32, #46, #60 | Moving driver pin from real driver locations (SSE/WebSocket, with polling as fallback); location stops after delivery |
+| Phase 7 · Real-time tracking | ✅ complete (#32, #132, #134, #46, #60) | — | Met: moving driver pin from real locations over SSE with polling fallback; nothing after delivery; assignment/ETA contracts; untrusted locations bound to the delivery |
 | Phase 8 · Customer product features | Backlog | #34, #35, #48, #58 (+ avatar upload UI, reorder: app-only) | Refresh tokens, password recovery, opening hours, stock windows |
 | Phase 9 · Production readiness | Backlog (runs alongside) | #6, #7, #8, #14, #15, #16, #20, #30, #37, #38, #101. **New, unfiled (§9):** service identity instead of ADMIN system tokens, DB least privilege, TypeORM undefined-where guard, correlation ids across HTTP + Kafka | Staging + deploy pipeline; metrics, lag and DLQ alerts; tested backup/restore; graceful shutdown; per-service DB roles; non-root image |
 
@@ -243,7 +260,7 @@ flowchart LR
 4. ~~**Phase 4: driver app, then restaurant app**~~: done (#99, #100). The driver app came first because it supplies real location data for Phase 7.
 5. ~~**Phase 5: replace the stand-ins**~~: done locally (customer #20); GitHub needs the `CLIENT_APPS_READ_TOKEN` secret.
 6. **Phase 6: notifications.** ~~`customerId` + handlers (#5)~~ done (#129); remaining: failed/cancelled-payment notifications, retries (#50), preferences (#51), push.
-7. **Phase 7: real-time tracking (next).** Drivers now send locations. Start with SSE or WebSocket for the moving pin, keep polling as the fallback, and make the location stale-aware (#32).
+7. ~~**Phase 7: real-time tracking**~~: done (#32, #132, #134, #46, #60).
 8. **Phase 8: product features**, by user demand.
 9. **Phase 9 continuously,** with this priority: metrics + consumer-lag/DLQ alerts (#15) → graceful shutdown (#7) → HTTP timeouts (#6, #38) → backups (#16) → container/DB least privilege (#14) → staging + deploy pipeline. Production launch is gated on these, not on Phase 8.
 
@@ -417,6 +434,11 @@ Every row was checked in the code. F1, F2 and F10 are fixed (struck through belo
 ---
 
 ## 13. Planning changes in this revision
+
+**2026-10-06 (Phase 7 complete):**
+- Step 3 realtime (#134: backend #137, customer #26), #46 assignment + ETA contracts (backend #138) and #60 location trust boundaries (backend #139, driver #21) are merged.
+- Phase 7 is complete.
+- Stale statements removed: "no driver location/map", "clients poll only", Phase 7 "next".
 
 **2026-10-06 (sync after Phases 4–6):**
 - Phase 4 complete:
