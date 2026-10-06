@@ -113,8 +113,9 @@ tags:
       text: Sharing your location with the customer
     timeout: 15000
 
-# CUSTOMER APP: the driver is assigned. The customer app has no map yet (Phase 7), so the runner
-# checks the customer's tracking endpoint (customer token) returns the position the driver app sent.
+# CUSTOMER APP: the driver is assigned. The runner checks the customer's tracking endpoint (customer
+# token) returns the position the driver app sent as LIVE; the order screen shows it as live with a
+# map link (#32).
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
@@ -125,6 +126,13 @@ tags:
     file: ../../scripts/control.js
     env:
       ACTION: tracking/assert-location
+- extendedWaitUntil:
+    visible:
+      id: driver-location-status
+      text: 'Live · updated .*'
+    timeout: 25000
+- assertVisible:
+    id: driver-location-map
 
 # DRIVER APP: picked up.
 - openLink: ${DRIVER_APP_URL}/home
@@ -194,6 +202,9 @@ tags:
 - assertVisible:
     id: delivery-stage
     text: Delivered
+# Tracking ended with the delivery: no driver position any more.
+- assertNotVisible:
+    id: driver-location
 
 # Server-side checks for this order: DELIVERED, exactly one delivery row, no new dead letters.
 - runScript:
