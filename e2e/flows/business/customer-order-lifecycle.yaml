@@ -152,6 +152,72 @@ tags:
 - assertVisible:
     id: driver-location-map
 
+# REALTIME (#134): the order screen is subscribed to the tracking stream, so polling is off.
+- extendedWaitUntil:
+    visible:
+      id: tracking-connection
+      text: Live updates
+    timeout: 15000
+# Let the shown position age (the driver app isn't open, so nothing new is reported)…
+- extendedWaitUntil:
+    visible:
+      id: driver-location-detail
+      text: 'Updated [1-5][0-9] s ago'
+    timeout: 30000
+# …then the driver reports a new position through the real API. With polling off it can only reach
+# the screen by push, and well inside one 10 s polling interval.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: tracking/move-driver
+- extendedWaitUntil:
+    visible:
+      id: driver-location-detail
+      text: Updated just now
+    timeout: 5000
+- assertVisible:
+    id: driver-location-status
+    text: Live
+
+# CONNECTION INTERRUPTION: the gateway goes away. The stream drops and the polling fallback fails
+# too, so the screen must stop calling the position Live and say it is reconnecting.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: gateway/stop
+- extendedWaitUntil:
+    visible:
+      id: tracking-connection
+      text: Reconnecting…
+    timeout: 30000
+- assertVisible:
+    id: driver-location-status
+    text: Last known location
+- assertVisible:
+    id: driver-marker
+# The gateway is back: the client reconnects on its own (capped backoff) and realtime resumes.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: gateway/start
+- extendedWaitUntil:
+    visible:
+      id: tracking-connection
+      text: Live updates
+    timeout: 60000
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: tracking/move-driver
+- extendedWaitUntil:
+    visible:
+      id: driver-location-detail
+      text: Updated just now
+    timeout: 5000
+- assertVisible:
+    id: driver-location-status
+    text: Live
+
 # DRIVER APP: picked up.
 - openLink: ${DRIVER_APP_URL}/home
 - extendedWaitUntil:

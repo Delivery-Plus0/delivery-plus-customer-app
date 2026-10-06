@@ -150,17 +150,26 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 
 ## 5. Current sprint
 
-**Now: Phase 7 · real-time tracking** (#32, #132, then #46, #60):
+**Now: Phase 7 · real-time tracking** (#32, #132, #134, then #46, #60):
 1. ✅ **Step 1, tracking lifecycle (#32):** backend #131 and customer #24.
    - The tracking endpoint returns one explicit state: `NO_DRIVER`, `AWAITING_LOCATION`, `LIVE`, `STALE` (over 60 s old) or `ENDED` (no position after delivery or cancellation).
    - The order screen shows a status card.
-2. 🔄 **Step 2, customer map (#132):**
+2. ✅ **Step 2, customer map (#132):** customer #25 and backend #133.
    - A street map on the order screen with the driver pin, labelled Live, or a dimmed "Last known location" when stale.
    - Text-only states for no driver and waiting for location; nothing once ended.
    - The map is OpenStreetMap tiles via `expo-image`, with no new dependency.
-   - Still polling every 10 s.
    - Authorization: another customer gets 403 (API e2e) and no card appears (Maestro).
-3. **Step 3, push:** SSE or WebSocket for tracking updates, with the current polling as the fallback. It replaces the transport inside `useDeliveryTracking` only.
+3. 🔄 **Step 3, realtime (#134):** backend #135 and customer #136.
+   - **Transport:** Server-Sent Events, chosen over WebSocket. It keeps the normal auth header and the HTTP gateway as-is, needs no new dependency, and the updates only go one way.
+   - **Backend:** `GET /tracking/delivery/:id/stream`.
+     - Driver reports and `delivery.events` trigger recomputes through Redis pub/sub.
+     - It authorizes before streaming and on every 30 s resync, pushes STALE on a timer, and closes after ENDED.
+   - **Customer:** `useDeliveryTracking` subscribes while focused.
+     - Reconnects with capped backoff (1 → 30 s).
+     - Falls back to the 10 s polling only while the stream is down.
+     - Never says "Live" for disconnected data.
+     - Shows a caption: Live updates / Reconnecting… / Updating every 10 s.
+   - **Scope:** only customer delivery tracking is realtime.
 4. **Then #46 and #60:** ETA and geofence trust boundaries.
 
 Every step ships with unit tests and a Maestro assertion in the cross-app business flow.

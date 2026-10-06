@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -7,7 +8,19 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { Delivery } from '@/services/deliveries';
 import { useDeliveryTracking } from '@/state/tracking';
-import { describeTracking, mapLink, type TrackingView } from '@/utils/tracking';
+import { describeConnection, describeTracking, mapLink, type TrackingView } from '@/utils/tracking';
+
+/** "Updated 8 s ago" keeps counting between pushes. */
+const AGE_TICK_MS = 5_000;
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
 
 const ICONS: Record<Exclude<TrackingView['kind'], 'hidden'>, IconName> = {
   finding: 'clock',
@@ -23,7 +36,9 @@ const ICONS: Record<Exclude<TrackingView['kind'], 'hidden'>, IconName> = {
  */
 export function DriverLocationCard({ delivery }: { delivery: Delivery | null | undefined }) {
   const tracking = useDeliveryTracking(delivery);
-  const view = describeTracking({ tracking: tracking.data, refreshFailed: tracking.error !== undefined });
+  const now = useNow(AGE_TICK_MS);
+  const view = describeTracking({ tracking: tracking.data, fresh: tracking.fresh, connection: tracking.connection, now });
+  const caption = describeConnection(tracking.connection, tracking.fresh);
 
   if (!tracking.data && tracking.error) {
     return (
@@ -66,6 +81,11 @@ export function DriverLocationCard({ delivery }: { delivery: Delivery | null | u
           <ThemedText type="small" themeColor="textSecondary" testID="driver-location-detail">
             {view.detail}
           </ThemedText>
+          {caption ? (
+            <ThemedText type="caption" themeColor="textSecondary" testID="tracking-connection">
+              {caption}
+            </ThemedText>
+          ) : null}
         </View>
       </View>
 

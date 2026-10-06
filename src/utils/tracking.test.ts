@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { DeliveryTracking } from '@/services/tracking';
 
-import { describeTracking, formatLocationAge, mapLink } from './tracking';
+import { currentLocationAge, describeConnection, describeTracking, formatLocationAge, mapLink } from './tracking';
 
 const CAIRO = { latitude: 30.0444, longitude: 31.2357 };
 
@@ -130,6 +130,48 @@ describe('describeTracking: refresh failures (offline, timeout, 5xx)', () => {
   it('keeps the server state for non-position states (no invented state)', () => {
     expect(describeTracking({ tracking: read({ tracking: 'AWAITING_LOCATION', location: null }), refreshFailed: true }).kind).toBe('awaiting');
     expect(describeTracking({ tracking: read({ tracking: 'ENDED', location: null }), refreshFailed: true }).kind).toBe('hidden');
+  });
+});
+
+describe('describeTracking: realtime connection (Phase 7 Step 3)', () => {
+  it('Live while the data is fresh (stream open)', () => {
+    expect(describeTracking({ tracking: read({}), fresh: true, connection: 'open' })).toMatchObject({ title: 'Live' });
+  });
+
+  it('never Live while disconnected without a fresh refresh: last known · reconnecting…', () => {
+    expect(describeTracking({ tracking: read({}), fresh: false, connection: 'reconnecting' })).toMatchObject({
+      freshness: 'stale',
+      title: 'Last known location',
+      detail: 'Updated 8 s ago · reconnecting…',
+    });
+  });
+
+  it('Live again once polling refreshed it during the outage', () => {
+    expect(describeTracking({ tracking: read({}), fresh: true, connection: 'reconnecting' })).toMatchObject({ title: 'Live' });
+  });
+
+  it('STALE stays last known whatever the connection', () => {
+    expect(describeTracking({ tracking: read({ tracking: 'STALE' }), fresh: true, connection: 'open' })).toMatchObject({
+      title: 'Last known location',
+    });
+  });
+
+  it('the position keeps aging locally between pushes', () => {
+    const received = read({ locationAgeSeconds: 2, receivedAt: 1_000_000 });
+    expect(describeTracking({ tracking: received, now: 1_000_000 })).toMatchObject({ detail: 'Updated just now' });
+    expect(describeTracking({ tracking: received, now: 1_018_000 })).toMatchObject({ detail: 'Updated 20 s ago' });
+    expect(currentLocationAge(received, 1_000_000 - 5_000)).toBe(2);
+  });
+});
+
+describe('describeConnection', () => {
+  it('says how updates arrive', () => {
+    expect(describeConnection('open', true)).toBe('Live updates');
+    expect(describeConnection('reconnecting', false)).toBe('Reconnecting…');
+    expect(describeConnection('reconnecting', true)).toBe('Updating every 10 s');
+    expect(describeConnection('connecting', true)).toBeUndefined();
+    expect(describeConnection('closed', true)).toBeUndefined();
+    expect(describeConnection(undefined, true)).toBeUndefined();
   });
 });
 
