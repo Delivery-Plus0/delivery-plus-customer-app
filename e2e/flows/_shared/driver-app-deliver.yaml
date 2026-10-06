@@ -9,18 +9,24 @@ url: ${DRIVER_APP_URL}/home
     timeout: 20000
 - tapOn:
     id: delivery-action-pickup
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: delivery-action-start
     timeout: 15000
 - tapOn:
     id: delivery-action-start
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: delivery-action-complete
     timeout: 15000
 - tapOn:
     id: delivery-action-complete
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: waiting-for-job

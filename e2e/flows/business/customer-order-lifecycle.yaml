@@ -240,6 +240,8 @@ tags:
     timeout: 20000
 - tapOn:
     id: delivery-action-pickup
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: delivery-action-start
@@ -261,6 +263,8 @@ tags:
     timeout: 20000
 - tapOn:
     id: delivery-action-start
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: delivery-action-complete
@@ -282,6 +286,8 @@ tags:
     timeout: 20000
 - tapOn:
     id: delivery-action-complete
+- tapOn:
+    id: delivery-confirm-confirm
 - extendedWaitUntil:
     visible:
       id: waiting-for-job
