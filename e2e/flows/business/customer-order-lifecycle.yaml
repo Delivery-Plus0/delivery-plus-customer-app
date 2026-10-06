@@ -201,8 +201,13 @@ tags:
     env:
       ACTION: verify/order-integrity
 
-# CUSTOMER APP: the confirmation notification is in Alerts.
+# CUSTOMER APP: Alerts has a notification for every stage of this order (#5): payment received, order
+# confirmed, driver assigned, picked up, delivered.
 - openLink: ${APP_URL}/notifications
 - extendedWaitUntil:
-    visible: '.*${output.control.orderId} has been confirmed\.'
+    visible: '.*${output.control.orderId} has been delivered\..*'
     timeout: 20000
+- assertVisible: '.*${output.control.orderId} has been picked up and is on its way\.'
+- assertVisible: '.*on the way to pick up your order ${output.control.orderId}\.'
+- assertVisible: '.*${output.control.orderId} has been confirmed\.'
+- assertVisible: '.*received your payment for order ${output.control.orderId}\.'
