@@ -31,7 +31,36 @@ export type TrackingViewInput = {
   tracking: DeliveryTracking | undefined;
   /** The latest refresh failed: the data on screen may be outdated, so nothing is called "Live". */
   refreshFailed?: boolean;
+  /**
+   * Whether the data is known to be current (realtime stream open, or a refresh succeeded since it
+   * dropped). Defaults to `!refreshFailed`. When false, a position is shown as last known.
+   */
+  fresh?: boolean;
+  /** Realtime connection state, for the caption under the status (Phase 7 Step 3). */
+  connection?: 'connecting' | 'open' | 'reconnecting' | 'closed';
+  /** Now (ms epoch): ages a position received at `tracking.receivedAt` locally. */
+  now?: number;
 };
+
+/**
+ * Caption under the status: how the screen is getting updates. Undefined when there's nothing worth
+ * saying (still connecting, or no realtime at all).
+ * - open → "Live updates"
+ * - not open and data not fresh → "Reconnecting…"
+ * - not open but polling keeps data fresh → "Updating every 10 s"
+ */
+export function describeConnection(connection: TrackingViewInput['connection'], fresh: boolean): string | undefined {
+  if (connection === 'open') return 'Live updates';
+  if (connection === 'reconnecting') return fresh ? 'Updating every 10 s' : 'Reconnecting…';
+  return undefined;
+}
+
+/** Server age at receipt, plus the time since this device received it. */
+export function currentLocationAge(tracking: DeliveryTracking, now?: number): number {
+  const base = tracking.locationAgeSeconds ?? 0;
+  if (now === undefined || tracking.receivedAt === undefined) return base;
+  return base + Math.max(0, Math.floor((now - tracking.receivedAt) / 1000));
+}
 
 const HIDDEN: TrackingView = { kind: 'hidden' };
 
@@ -44,8 +73,9 @@ const HIDDEN: TrackingView = { kind: 'hidden' };
  * - ENDED, no data, or an unknown state → nothing (a finished delivery never shows a position)
  * A LIVE/STALE read without usable coordinates shows "location unavailable" without a pin.
  */
-export function describeTracking({ tracking, refreshFailed = false }: TrackingViewInput): TrackingView {
+export function describeTracking({ tracking, refreshFailed = false, fresh, now }: TrackingViewInput): TrackingView {
   if (!tracking) return HIDDEN;
+  const current = (fresh ?? true) && !refreshFailed;
 
   switch (tracking.tracking) {
     case 'NO_DRIVER':
@@ -58,15 +88,15 @@ export function describeTracking({ tracking, refreshFailed = false }: TrackingVi
         return { kind: 'unavailable', title: 'Driver assigned', detail: "Your driver's location is unavailable right now." };
       }
       const position = { latitude: tracking.location.latitude, longitude: tracking.location.longitude };
-      const updated = `Updated ${formatLocationAge(tracking.locationAgeSeconds ?? 0)}`;
-      if (tracking.tracking === 'LIVE' && !refreshFailed) {
+      const updated = `Updated ${formatLocationAge(currentLocationAge(tracking, now))}`;
+      if (tracking.tracking === 'LIVE' && current) {
         return { kind: 'position', freshness: 'live', title: 'Live', detail: updated, position };
       }
       return {
         kind: 'position',
         freshness: 'stale',
         title: 'Last known location',
-        detail: refreshFailed ? `${updated} · reconnecting…` : updated,
+        detail: current ? updated : `${updated} · reconnecting…`,
         position,
       };
     }

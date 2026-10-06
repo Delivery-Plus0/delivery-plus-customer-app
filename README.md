@@ -12,7 +12,7 @@ Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs 
 | Browse | Restaurant list and search, restaurant page with menu |
 | Cart and checkout | One-restaurant cart, quantity changes, checkout with order + payment (idempotency keys, so retries never double-charge) |
 | Orders | Order history and detail, live status and delivery stages (polling every 10 s while active), cancel while allowed |
-| Driver on the map | While a delivery is in progress the order screen shows a street map with the driver's pin, labelled **Live** or **Last known location** (see below) |
+| Driver on the map | While a delivery is in progress the order screen shows a street map with the driver's pin, labelled **Live** or **Last known location**, updated in real time with polling as fallback (see below) |
 | Notifications | In-app notifications with an unread badge, one per order stage |
 
 The drop-off address comes from the customer's profile at checkout (the backend copies it onto the order). Dispatch is automatic on the backend, so the delivery card goes from "Finding a driver" to "Driver assigned" by itself.
@@ -30,12 +30,23 @@ The "Driver location" card follows the backend's tracking state (`GET /api/track
 | `ENDED` (delivered or cancelled) | nothing: the card and the driver's position are gone |
 
 - **Bad data:** invalid or missing coordinates show "location unavailable" and no pin.
-- **Failed refresh** (offline, timeout or server error): the last position stays on screen as **Last known location · reconnecting…**, never as "Live".
+- **Disconnected:** the last position stays on screen as **Last known location · reconnecting…**, never as "Live". This covers a failed refresh (offline, timeout, server error) and a dropped realtime stream with no successful refresh since.
 - **The map:** OpenStreetMap raster tiles drawn with `expo-image`, centred on the driver, so there is no native map SDK, no API key and the same behaviour on every platform.
   - If tiles fail to load, the pin and the status still show.
   - Set `EXPO_PUBLIC_MAP_TILE_URL` to a proper tile provider in production.
   - There is no route, ETA or animated movement: the pin is exactly where the driver last reported.
-- **Polling:** the order screen polls tracking every 10 s while focused, through the shared resource cache, and stops once the backend says `ENDED`. Real-time push (SSE/WebSocket, with this polling as fallback) is Phase 7 Step 3 and will replace the transport inside `useDeliveryTracking` only.
+- **Realtime, with polling as fallback (Phase 7 Step 3, #136):**
+  - **The stream:** while the order screen is focused, `useDeliveryTracking` subscribes to `GET /api/tracking/delivery/:id/stream` (Server-Sent Events, read with `expo/fetch` streaming on native and web, authenticated with the session token). Each pushed snapshot is merged into the same cache entry the card reads, so the map moves as soon as the driver reports.
+  - **Captions:** under the status:
+    - **Live updates**: the stream is open.
+    - **Reconnecting…**: it dropped and nothing fresh has arrived since.
+    - **Updating every 10 s**: fallback polling is keeping the data fresh.
+  - **Fallback:** the existing 10 s polling runs **only while the stream isn't open**, and stops again as soon as it reconnects.
+  - **Reconnect:** a network error, a server close, an `error` event or 40 s without any byte (the server pings every 15 s) means the stream is gone. Retries wait 1, 2, 5, 10, 20, then 30 s (capped), one connection at a time, until the screen is left.
+  - **When it stops:** on `ENDED`, on 401/403/404 (polling continues), on blur or unmount.
+  - **Ordering:** pushed and polled snapshots both go through `mergeTracking`. For the same driver, an older position never replaces a newer one, and `ENDED` is final. The "Updated … ago" age keeps counting locally between pushes.
+  - **Layers:** `services/tracking-stream.ts` (transport) → `state/tracking-realtime.ts` (connection state machine) → `state/tracking.ts` (data source) → `utils/tracking.ts` (`describeTracking`, the single state → UI mapping) → `components/driver-location-card.tsx` / `tracking-map.tsx`.
+  - **Scope:** only this tracking card is realtime; the rest of the app still polls.
 
 ## Getting started
 

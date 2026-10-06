@@ -24,6 +24,8 @@ export type DeliveryTracking = {
   location: DriverPosition | null;
   tracking: TrackingState;
   locationAgeSeconds: number | null;
+  /** Client-only: when this device received the snapshot (ms epoch), to age the position locally. */
+  receivedAt?: number;
 };
 
 /** The customer's view of the driver's position; delivery-service checks they own the order. */

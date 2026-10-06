@@ -48,6 +48,8 @@ const DRIVER_WEB_PORT = Number(process.env.E2E_DRIVER_WEB_PORT ?? 8084);
 const DRIVER_APP_URL = `http://localhost:${DRIVER_WEB_PORT}`;
 const DRIVER_WEB_BUILD = join(E2E_DIR, '.driver-web-build');
 const DRIVER_FIXED_LOCATION = { latitude: 30.0444, longitude: 31.2357 };
+// A few streets further, for the realtime push check (tracking/move-driver).
+const DRIVER_MOVED_LOCATION = { latitude: 30.0478, longitude: 31.2402 };
 // The real restaurant app (separate repo) runs the kitchen steps of the business flow, served on :8085.
 const RESTAURANT_APP_DIR = resolve(process.env.RESTAURANT_APP_DIR ?? join(APP_DIR, '..', 'delivery-plus-restaurant-app'));
 const RESTAURANT_WEB_PORT = Number(process.env.E2E_RESTAURANT_WEB_PORT ?? 8085);
@@ -262,6 +264,16 @@ const actions = {
       if (Date.now() > deadline) throw new Error(`No live driver location for delivery ${delivery.id} (got ${JSON.stringify(tracking)})`);
       await new Promise((r) => setTimeout(r, 1_000));
     }
+  },
+  // The QA driver reports a new position through the real API (POST /api/tracking/location with the
+  // driver's own token), exactly what the driver app does every 10 s. Used while the customer screen
+  // is open to prove the update arrives by push (Maestro web has one tab, so the driver app can't
+  // report at the same time). Alternates between two nearby points so each report is new.
+  'tracking/move-driver': async () => {
+    const driver = await login(manifest.accounts.driver.email);
+    state.moves = (state.moves ?? 0) + 1;
+    const position = state.moves % 2 ? DRIVER_MOVED_LOCATION : DRIVER_FIXED_LOCATION;
+    await api('POST', '/api/tracking/location', driver, position);
   },
   // After the cycle: order and delivery DELIVERED, exactly one delivery for the order (automatic
   // dispatch, no duplicate), and nothing new in any dead-letter topic since the suite started.
