@@ -22,7 +22,7 @@ tags:
     timeout: 20000
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: Finding a driver
     timeout: 20000
 - assertVisible: '.*QA Pasta'
@@ -50,7 +50,7 @@ tags:
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: Driver assigned
     timeout: 40000
 # Leave the QA driver free for the business flow: deliver it in the driver app.

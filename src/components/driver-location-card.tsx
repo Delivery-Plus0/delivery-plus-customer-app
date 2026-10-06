@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -6,21 +5,15 @@ import { TrackingMap } from '@/components/tracking-map';
 import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
-import type { Delivery } from '@/services/deliveries';
-import { useDeliveryTracking } from '@/state/tracking';
+import { useNow } from '@/hooks/use-now';
+import type { useDeliveryTracking } from '@/state/tracking';
 import { describeConnection, describeTracking, mapLink, type TrackingView } from '@/utils/tracking';
+
+/** The tracking data source, owned by the screen so one screen opens one stream. */
+export type DeliveryTrackingResource = ReturnType<typeof useDeliveryTracking>;
 
 /** "Updated 8 s ago" keeps counting between pushes. */
 const AGE_TICK_MS = 5_000;
-
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
 
 const ICONS: Record<Exclude<TrackingView['kind'], 'hidden'>, IconName> = {
   finding: 'clock',
@@ -34,8 +27,7 @@ const ICONS: Record<Exclude<TrackingView['kind'], 'hidden'>, IconName> = {
  * usable position, a map with the driver pin. Data comes from useDeliveryTracking; what to show
  * comes from describeTracking (the single state → UI mapping). Renders nothing once tracking ended.
  */
-export function DriverLocationCard({ delivery }: { delivery: Delivery | null | undefined }) {
-  const tracking = useDeliveryTracking(delivery);
+export function DriverLocationCard({ tracking }: { tracking: DeliveryTrackingResource }) {
   const now = useNow(AGE_TICK_MS);
   const view = describeTracking({ tracking: tracking.data, fresh: tracking.fresh, connection: tracking.connection, now });
   const caption = describeConnection(tracking.connection, tracking.fresh);

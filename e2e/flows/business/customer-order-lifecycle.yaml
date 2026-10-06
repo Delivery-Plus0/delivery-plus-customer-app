@@ -81,9 +81,15 @@ tags:
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: Finding a driver
     timeout: 30000
+# The search is a first-class phase (#140): it says how long it has been looking, and no driver is shown yet.
+- assertVisible:
+    id: order-phase-note
+    text: 'Searching for .*'
+- assertNotVisible:
+    id: driver-card
 # Tracking says NO_DRIVER: the card says so and there is no map and no driver position (#132).
 - extendedWaitUntil:
     visible:
@@ -130,9 +136,17 @@ tags:
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: Driver assigned
     timeout: 30000
+# Who is coming (#140): the driver card shows the assigned driver's first name and vehicle, from the
+# delivery read (customer-safe fields only).
+- extendedWaitUntil:
+    visible:
+      id: driver-card-name
+    timeout: 15000
+- assertVisible:
+    id: driver-card-vehicle
 - runScript:
     file: ../../scripts/control.js
     env:
@@ -235,7 +249,7 @@ tags:
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: Picked up
     timeout: 30000
 
@@ -256,7 +270,7 @@ tags:
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
-      id: delivery-stage
+      id: order-phase
       text: On the way
     timeout: 30000
 
@@ -284,7 +298,7 @@ tags:
       text: Delivered
     timeout: 30000
 - assertVisible:
-    id: delivery-stage
+    id: order-phase
     text: Delivered
 # Tracking ended with the delivery (ENDED): no card, no map, no driver position any more.
 - assertNotVisible:
