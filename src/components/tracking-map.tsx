@@ -36,6 +36,9 @@ export function TrackingMap({ position, freshness }: TrackingMapProps) {
   return (
     <View
       testID="tracking-map"
+      // On web the accessibility label becomes aria-label, which Maestro would take as this
+      // element's id; nativeID renders as the HTML id, which it prefers.
+      nativeID="tracking-map"
       style={styles.map}
       onLayout={(event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width))}
       accessible
