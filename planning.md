@@ -150,10 +150,18 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 
 ## 5. Current sprint
 
-**Next: Phase 7 · real-time tracking** (#32, #46, #60):
-1. Customer location UI on the order screen, reading `GET /tracking/delivery/:id`.
-2. SSE or WebSocket for the moving pin, with polling as the fallback.
-3. Stale-location handling (#32) and stopping location after completion.
+**Now: Phase 7 · real-time tracking** (#32, #132, then #46, #60):
+1. ✅ **Step 1, tracking lifecycle (#32):** backend #131 and customer #24.
+   - The tracking endpoint returns one explicit state: `NO_DRIVER`, `AWAITING_LOCATION`, `LIVE`, `STALE` (over 60 s old) or `ENDED` (no position after delivery or cancellation).
+   - The order screen shows a status card.
+2. 🔄 **Step 2, customer map (#132):**
+   - A street map on the order screen with the driver pin, labelled Live, or a dimmed "Last known location" when stale.
+   - Text-only states for no driver and waiting for location; nothing once ended.
+   - The map is OpenStreetMap tiles via `expo-image`, with no new dependency.
+   - Still polling every 10 s.
+   - Authorization: another customer gets 403 (API e2e) and no card appears (Maestro).
+3. **Step 3, push:** SSE or WebSocket for tracking updates, with the current polling as the fallback. It replaces the transport inside `useDeliveryTracking` only.
+4. **Then #46 and #60:** ETA and geofence trust boundaries.
 
 Every step ships with unit tests and a Maestro assertion in the cross-app business flow.
 

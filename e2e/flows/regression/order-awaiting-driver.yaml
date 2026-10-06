@@ -26,6 +26,14 @@ tags:
       text: Finding a driver
     timeout: 20000
 - assertVisible: '.*QA Pasta'
+# Tracking is NO_DRIVER: no map and no driver position until a driver is assigned.
+- extendedWaitUntil:
+    visible:
+      id: driver-location-status
+      text: Finding a driver
+    timeout: 20000
+- assertNotVisible:
+    id: driver-marker
 # The driver goes online in the driver app; the auto-dispatch sweep (every 2 s on the E2E stack)
 # assigns the waiting delivery, and the customer app picks it up on its next poll.
 - openLink: ${DRIVER_APP_URL}/home

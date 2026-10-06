@@ -12,9 +12,30 @@ Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs 
 | Browse | Restaurant list and search, restaurant page with menu |
 | Cart and checkout | One-restaurant cart, quantity changes, checkout with order + payment (idempotency keys, so retries never double-charge) |
 | Orders | Order history and detail, live status and delivery stages (polling every 10 s while active), cancel while allowed |
-| Notifications | In-app notifications with an unread badge |
+| Driver on the map | While a delivery is in progress the order screen shows a street map with the driver's pin, labelled **Live** or **Last known location** (see below) |
+| Notifications | In-app notifications with an unread badge, one per order stage |
 
 The drop-off address comes from the customer's profile at checkout (the backend copies it onto the order). Dispatch is automatic on the backend, so the delivery card goes from "Finding a driver" to "Driver assigned" by itself.
+
+### Driver tracking on the order screen
+
+The "Driver location" card follows the backend's tracking state (`GET /api/tracking/delivery/:id`, see the backend's `docs/services/tracking-service.md`). The state is the only input; the app never guesses it from a missing location:
+
+| Backend `tracking` | The card shows |
+| --- | --- |
+| `NO_DRIVER` | "Finding a driver", no map |
+| `AWAITING_LOCATION` | "Driver assigned · Waiting for location…", no map |
+| `LIVE` | "Live · Updated 8 s ago", map with a red **Driver** pin at the reported position |
+| `STALE` (no report for over 60 s) | "Last known location · Updated 4 min ago", dimmed map with a grey pin |
+| `ENDED` (delivered or cancelled) | nothing: the card and the driver's position are gone |
+
+- **Bad data:** invalid or missing coordinates show "location unavailable" and no pin.
+- **Failed refresh** (offline, timeout or server error): the last position stays on screen as **Last known location · reconnecting…**, never as "Live".
+- **The map:** OpenStreetMap raster tiles drawn with `expo-image`, centred on the driver, so there is no native map SDK, no API key and the same behaviour on every platform.
+  - If tiles fail to load, the pin and the status still show.
+  - Set `EXPO_PUBLIC_MAP_TILE_URL` to a proper tile provider in production.
+  - There is no route, ETA or animated movement: the pin is exactly where the driver last reported.
+- **Polling:** the order screen polls tracking every 10 s while focused, through the shared resource cache, and stops once the backend says `ENDED`. Real-time push (SSE/WebSocket, with this polling as fallback) is Phase 7 Step 3 and will replace the transport inside `useDeliveryTracking` only.
 
 ## Getting started
 
