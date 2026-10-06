@@ -84,6 +84,16 @@ tags:
       id: delivery-stage
       text: Finding a driver
     timeout: 30000
+# Tracking says NO_DRIVER: the card says so and there is no map and no driver position (#132).
+- extendedWaitUntil:
+    visible:
+      id: driver-location-status
+      text: Finding a driver
+    timeout: 20000
+- assertNotVisible:
+    id: tracking-map
+- assertNotVisible:
+    id: driver-marker
 
 # DRIVER APP: going online is what gets the order assigned; the app finds the job through
 # GET /deliveries/me/current and starts sharing its location.
@@ -114,8 +124,9 @@ tags:
     timeout: 15000
 
 # CUSTOMER APP: the driver is assigned. The runner checks the customer's tracking endpoint (customer
-# token) returns the position the driver app sent as LIVE; the order screen shows it as live with a
-# map link (#32).
+# token) returns the position the driver app sent as LIVE (#32); the order screen shows it Live on
+# the map with the driver pin (#132). Maestro web can't inspect map tiles, so the flow asserts the
+# map container, the pin and the status around it.
 - openLink: ${APP_URL}/order/${output.control.orderId}
 - extendedWaitUntil:
     visible:
@@ -129,8 +140,15 @@ tags:
 - extendedWaitUntil:
     visible:
       id: driver-location-status
-      text: 'Live · updated .*'
+      text: Live
     timeout: 25000
+- assertVisible:
+    id: driver-location-detail
+    text: 'Updated .*'
+- assertVisible:
+    id: tracking-map
+- assertVisible:
+    id: driver-marker
 - assertVisible:
     id: driver-location-map
 
@@ -202,9 +220,13 @@ tags:
 - assertVisible:
     id: delivery-stage
     text: Delivered
-# Tracking ended with the delivery: no driver position any more.
+# Tracking ended with the delivery (ENDED): no card, no map, no driver position any more.
 - assertNotVisible:
     id: driver-location
+- assertNotVisible:
+    id: tracking-map
+- assertNotVisible:
+    id: driver-marker
 
 # Server-side checks for this order: DELIVERED, exactly one delivery row, no new dead letters.
 - runScript:

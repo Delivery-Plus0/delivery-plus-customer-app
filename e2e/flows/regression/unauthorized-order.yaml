@@ -15,3 +15,8 @@ tags:
 - assertNotVisible: QA Lemonade
 - assertNotVisible:
     id: delivery-card
+# No tracking either: the delivery (and so its tracking) is only reachable through the customer's own order.
+- assertNotVisible:
+    id: driver-location
+- assertNotVisible:
+    id: driver-marker
