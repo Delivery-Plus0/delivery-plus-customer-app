@@ -248,7 +248,8 @@ const actions = {
     state.orderId = order.id;
   },
   // VERIFICATIONS (read-only, as the customer or from the stack's own stores).
-  // The customer's tracking view returns the position the driver app sent (fixed in its E2E build).
+  // The customer's tracking view returns the position the driver app sent (fixed in its E2E build),
+  // reported as LIVE (backend #32).
   'tracking/assert-location': async () => {
     const customer = await login(manifest.accounts.customer.email);
     const delivery = await api('GET', `/api/deliveries/by-order/${state.orderId}`, customer);
@@ -256,8 +257,9 @@ const actions = {
     for (;;) {
       const tracking = await api('GET', `/api/tracking/delivery/${delivery.id}`, customer);
       const { latitude, longitude } = tracking.location ?? {};
-      if (latitude === DRIVER_FIXED_LOCATION.latitude && longitude === DRIVER_FIXED_LOCATION.longitude) return;
-      if (Date.now() > deadline) throw new Error(`No driver location for delivery ${delivery.id} (got ${JSON.stringify(tracking.location)})`);
+      const atDriver = latitude === DRIVER_FIXED_LOCATION.latitude && longitude === DRIVER_FIXED_LOCATION.longitude;
+      if (atDriver && tracking.tracking === 'LIVE') return;
+      if (Date.now() > deadline) throw new Error(`No live driver location for delivery ${delivery.id} (got ${JSON.stringify(tracking)})`);
       await new Promise((r) => setTimeout(r, 1_000));
     }
   },

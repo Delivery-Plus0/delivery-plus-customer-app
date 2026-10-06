@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { DeliveryCard } from '@/components/delivery-card';
+import { DriverLocationCard } from '@/components/driver-location-card';
 import { OrderStatusBadge, OrderTimeline } from '@/components/order-status';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
@@ -132,6 +133,8 @@ export default function OrderDetailScreen() {
             onRetry={() => void delivery.refresh()}
           />
         ) : null}
+
+        {live ? <DriverLocationCard delivery={delivery.data} /> : null}
 
         <Card>
           <ThemedText type="heading">Items</ThemedText>
