@@ -1,25 +1,31 @@
 # Delivery Plus — Platform & Customer App Planning
 
-_Last updated: 2026-10-02. Backend `dev`: #105–#111 merged (Phase 3 complete; #111 gateway dev CORS for the driver app). App repos on GitHub (private, default `dev`): customer app #1, #16, #17; driver app #13, #15, #16._
+_Last updated: 2026-10-06._
 
-This plan covers the customer app (`delivery-plus-customer-app`), the driver app (`delivery-plus-driver-app`) and the backend (`delivery-plus`). It is rebuilt from the code and from what the automated runs actually showed. **Definition of done:** a change is done only when the right levels of verification pass: unit → integration (live API) → contract (OpenAPI) → UI/E2E → business flow. Each "done" below names the levels it has.
+- **Backend `dev`:** merged up to #129, which delivers per-stage customer notifications (#5).
+- **App repos on GitHub** (private, default `dev`):
+  - customer app: up to #21
+  - driver app: up to #19
+  - restaurant app: up to #8
+
+This plan covers the customer app (`delivery-plus-customer-app`), the driver app (`delivery-plus-driver-app`), the restaurant app (`delivery-plus-restaurant-app`) and the backend (`delivery-plus`). It is rebuilt from the code and from what the automated runs actually showed. **Definition of done:** a change is done only when the right levels of verification pass: unit → integration (live API) → contract (OpenAPI) → UI/E2E → business flow. Each "done" below names the levels it has.
 
 ---
 
 ## 1. Where the project is now
 
-**Overall: the backend carries an order from checkout to a driver without anyone calling the API, and a real driver app now takes it from there: a driver signs in, goes online, gets the job automatically and delivers it and shares their location while on the job (#99 steps 1–6, Maestro-verified locally and in GitHub CI). Left in #99: the cross-app customer run (step 7). Then the restaurant dashboard (#100).**
+**Overall: an order goes from checkout to the customer's door through three real apps and no API stand-ins. The customer orders, the restaurant app prepares and readies it, the backend dispatches it automatically, and the driver app picks it up and delivers it. The customer gets a notification at every stage. Events are published through a transactional outbox. Next is Phase 7: real-time tracking.**
 
 | Phase | State |
 | --- | --- |
 | 0 · Foundations (services, gateway, DBs, Compose, CI, migrations, OpenAPI) | ✅ done |
-| 1 · Hardening | ✅ core merged (#102); the critical self-registered-ADMIN hole is fixed (#105); 6 follow-ups and the review findings F3–F11 remain open |
-| 2 · Kafka reliability | ✅ core merged (#103); outbox (#98) and schema registry (#23) open |
+| 1 · Hardening | ✅ core merged (#102, #105); #59 ownership boundaries (#123) and #125 owner suspension guard (#128) done; 5 follow-ups and the review findings F3–F9, F11 remain open |
+| 2 · Kafka reliability | ✅ core merged (#103); outbox #98 done (#126 + reconciliation #127); schema registry (#23) open |
 | Phase 3 · Automatic dispatch + driver contracts | ✅ complete: #33 (#107), #95 (#108), #96 (#109), #97 (#110) |
-| 4 · Driver + restaurant clients | 🔄 **in progress**: driver app #99 steps 1–6 merged (driver repo #15, #16); step 7 (cross-app run) open; then #100 restaurant dashboard |
-| 5 · Full business flow E2E | ⚠️ dispatch is no longer a stand-in. The driver app's own business flow is real UI (customer + restaurant are stand-ins there); the customer app's business flow still uses driver and restaurant stand-ins. App E2E smoke runs in GitHub CI on PRs |
-| 6 · Notifications + push | ⚠️ unblocked; payment/delivery handlers are still empty (#5) |
-| 7 · Real-time tracking | ❌ blocked on Phase 4 (customer app polls every 10 s) |
+| 4 · Driver + restaurant clients | ✅ complete: driver app #99 (driver #15, #16; customer #19), restaurant app #100 (restaurant #6, #7) |
+| 5 · Full business flow E2E | ✅ locally: the customer business flow drives the real restaurant and driver apps (customer #20). ⚠️ On GitHub the cross-app flows need the `CLIENT_APPS_READ_TOKEN` secret (#13) |
+| 6 · Notifications + push | ✅ core: a notification for every customer-visible stage (#5, backend #129). Open: failed/cancelled-payment notifications, retries (#50), templates/preferences (#51), push |
+| 7 · Real-time tracking | 📋 **next**: the driver app sends locations; the customer app polls every 10 s and has no map |
 | 8 · Customer product features | 📋 backlog |
 | 9 · Production readiness | ⚠️ mostly missing: no metrics, no deploy pipeline, no backups, no graceful shutdown |
 
@@ -36,19 +42,26 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 - **Kafka reliability (#103):** events keyed by `orderId` with deterministic ids; durable deduplication in Redis (AOF); dead-letter topics with replay; retry-safe delivery actions.
 - **Customer app (private repo, `dev`):** login sends one request per submit and shows actionable errors; development builds show which API they use; the E2E suites follow automatic dispatch. CI and the Maestro smoke suite run on GitHub.
 - **Driver app (private repo, `dev`):** DRIVER-only sign-in, sign-up with first-use vehicle registration, online/offline toggle, current job from `me/current` (polled every 5 s on shift) with pickup, drop-off, items and the next action, then pickup → start → complete. Maestro: smoke 3/3 + business 1/1 locally; smoke green in GitHub CI.
+- **Restaurant app (private repo, `dev`):**
+  - Owner-only sign-in and restaurant selection.
+  - Orders board: preparing → ready (polled).
+  - Menu availability toggles.
+  - OPEN/BUSY/CLOSED status. SUSPENDED is shown but never selectable, and the backend refuses it for owners (#128).
+  - Maestro 3/3.
+- **Notifications (#5, backend #129):** payment received, order confirmed, driver assigned, picked up and delivered. The business flow asserts all five on Alerts (customer #22).
+- **Kafka outbox (#98):** order and delivery events are published if and only if their change committed. Drivers left BUSY after a finished delivery are released by a sweep (#127).
 - **Docs:** the engineering library (`docs/books`, #106) and the project context were updated with each PR.
 
 **What is missing or wrong (verified):**
-- **No restaurant client yet**, and the two app suites don't run together: the customer business flow still drives the driver by API, and the driver business flow still orders by API (dispatch is real in both).
 - **The customer app shows no driver location yet** (Phase 7): the driver app sends it (#99 step 6) and the customer's tracking endpoint returns it, but there is no map or pin in the UI.
+- **Cross-app flows don't run on GitHub yet:** they need the `CLIENT_APPS_READ_TOKEN` secret (read access to the driver and restaurant repos), which is an owner action.
 - **Driver choice is basic:** "most recently updated AVAILABLE driver", with no location, distance or fairness (F11).
-- **No outbox (#98):** a crash between a DB commit and its publish loses the event. Since #110 that can leave a ready order without an automatic delivery (manual dispatch still works).
-- **Delivery and payment event payloads have no `customerId`,** so customers get only the "order confirmed" notification (#5).
+- **Notifications:** none for a failed or cancelled payment, no retries/templates (#50, #51), no push.
 - **No production operations:** no metrics or alerts, no consumer-lag monitoring, no deploy pipeline or staging, no Postgres backups, no graceful shutdown.
 - **Open review findings F3–F11 (§9):** error-message leak on 500, superuser DB access and root image, ADMIN system tokens on a shared secret, cart lost update, non-atomic rate limiter, TypeORM `undefined`-where trap, correlation ids.
 - **App repos are private on the free plan:** branch protection/rulesets and CodeQL are unavailable there, so merges rely on the "all CI green" policy, not enforcement.
 
-**The plan, in one line:** Phase 4: finish the driver app (#99: location, cross-app run) → the restaurant dashboard (#100) → replace the remaining E2E stand-ins → notifications → real-time tracking. The outbox (#98) and production readiness run alongside. Details are in §5 and §6.
+**The plan, in one line:** Phase 7 real-time tracking (customer location UI, then SSE/WebSocket) → the Phase 6 remainder → Phase 8 customer features. Production readiness runs alongside. Details are in §5 and §6.
 
 ---
 
@@ -96,6 +109,15 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 | **#99 driver app, steps 1–5** (driver repo #15) | Scaffold (customer stack); DRIVER-only sign-in; sign-up + first-use vehicle registration; online/offline; current job (5 s poll on shift); pickup → start → complete following `nextActions`. Maestro runner on :8084/:8091; cleanup leaves the QA driver AVAILABLE for the customer suite | typecheck, lint, vitest 37/37; Maestro locally 4/4 (smoke 3/3, business 1/1: auto-dispatch → delivered → customer order DELIVERED); GitHub CI 4/4 incl. Maestro smoke |
 | **#99 step 6 · location sharing** (driver repo #16) | While DRIVER_ASSIGNED / PICKED_UP / IN_TRANSIT the app sends its position every 10 s (foreground) to `POST /api/tracking/location`; the card shows sharing / permission off / retrying. Dev/E2E builds use `EXPO_PUBLIC_FIXED_LOCATION` (Maestro web can't grant or fake geolocation) | vitest 45/45 (send loop, permission denied, retry, stop; parser; API call); Maestro locally 4/4: the customer's `GET /api/tracking/delivery/:id` returns the driver app's position; GitHub CI 4/4 incl. Maestro smoke; merged `b2b8baf` |
 | **Gateway dev CORS for :8084** (backend #111) | Default development origins include 8084 (driver app E2E web build); production still requires `CORS_ORIGINS` | Found by the driver Maestro run (sign-in blocked by preflight); unit 15/15; live preflight returns `Access-Control-Allow-Origin`; CI 22/22 |
+| **#99 step 7 · cross-app run** (customer #19) | The customer business flow drives the real driver app (go online, pickup → start → complete); #99 closed | Customer 9/9, driver 4/4 on a fresh stack; CI 4/4 |
+| **#59 ownership boundaries** (backend #123) | `GET /restaurants/me`; public restaurant DTOs omit owner fields; HMAC-protected ownership verification | Unit; live; CI green |
+| **#100 restaurant app** (restaurant #6, #7; backend #124) | Owner-only orders board (preparing → ready), menu availability, OPEN/BUSY/CLOSED status; SUSPENDED never selectable; gateway dev CORS for :8085 | Restaurant Maestro 3/3; CI green; #100 closed |
+| **Phase 5 · no stand-ins** (customer #20) | The business flow drives the real restaurant app too; the runner builds and serves the driver (:8084) and restaurant (:8085) apps | Customer 9/9 locally; cross-app flows on GitHub need `CLIENT_APPS_READ_TOKEN` |
+| **#98 transactional outbox** (backend #126) | order and delivery events staged in `outbox_events` with the write; `OutboxRelay` publishes (advisory lock, kick after commit, 500 ms poll) | Unit; live crash test 9/9; customer 9/9 |
+| **#98 driver-release reconciliation** (backend #127) | A sweep releases drivers still BUSY after a finished delivery with no active one | Unit (545 total); live fault injection 10/10 |
+| **E2E runner keep-alive retry** (customer #21, driver #19, restaurant #8) | A runner request that lands on a closed keep-alive socket (`UND_ERR_SOCKET`) is retried once | Customer 9/9, restaurant 3/3, driver 4/4 |
+| **#125 owner suspension guard** (backend #128) | Owners can neither set nor lift SUSPENDED (compare-and-set write against a non-suspended row) | Unit 41/41; CI green |
+| **#5 per-stage notifications** (backend #129; customer #22) | `customerId` on payment/delivery events (delivery stores it, migration 004); notifications for payment received, driver assigned, picked up, delivered next to confirmed; no `customerId` → skipped | `npm run verify` 555 passed; `seed:e2e` 5 notifications; `npm run e2e` per-stage assertion; customer business flow 1/1 with all five Alerts messages; CI 25/25 |
 
 ---
 
@@ -104,7 +126,7 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 | Client | Exists | Services used | Complete workflows | Missing |
 | --- | --- | --- | --- | --- |
 | **Customer app** (Expo 57; web build under E2E) | ✅ | auth, users, restaurants, menus, cart, orders, payments, deliveries, notifications | sign in, browse/search, cart, checkout, order status + delivery polling, cancel, notifications, profile | avatar upload UI, push, live map, native (Android/iOS) E2E |
-| **Restaurant dashboard** | ❌ | — | — | whole client (#100). Contract exists: owner order list, status transitions, menu/images; dispatch becomes automatic with #97 |
+| **Restaurant app** (Expo Router web) | ✅ MVP | auth, restaurants, menus, orders | owner sign-in, restaurant selection, orders board (preparing → ready), menu availability, OPEN/BUSY/CLOSED status | menu editing, opening hours, images UI, push |
 | **Driver app** (Expo 57; web build under E2E) | ✅ MVP | auth, drivers, deliveries, tracking | sign in (DRIVER only), sign up + vehicle, online/offline, current job, pickup → start → complete, location while on a job | background location, native (Android/iOS) E2E |
 | **Admin / ops** | ❌ | Swagger, Kafka UI (dev) | — | whole client |
 
@@ -114,33 +136,52 @@ This plan covers the customer app (`delivery-plus-customer-app`), the driver app
 
 | # | Blocker | Blocks | Owner |
 | --- | --- | --- | --- |
-| B1 | **No restaurant client** (#100) | Real kitchen workflow; restaurant UI E2E | New client |
+| B9 | Cross-app flows skipped on GitHub until the customer repo has `CLIENT_APPS_READ_TOKEN` | Three-app business flow in CI (#13) | Owner (repo secret) |
 | B6 | Android/iOS E2E not set up (needs a development build + emulator; no Android SDK on this machine) | Native UI regression coverage | Platform |
+| ~~B1~~ | ~~No restaurant client~~: **resolved** (#100, restaurant #6, #7) | — | — |
 | ~~B2~~ | ~~No driver client / no driver locations~~: **resolved** (#99 steps 1–6, driver repo #15, #16) | — | — |
 | ~~B5~~ | ~~App repos have no GitHub remote~~: **resolved** (0b; app CI + Maestro smoke run on GitHub) | — | — |
 | ~~B3~~ | ~~No auto-dispatch~~: **resolved** (#110) | — | — |
-| ~~B4~~ | ~~Delivery events never published~~: **resolved** (K3). Remaining: payloads lack `customerId`, no outbox | — | — |
+| ~~B4~~ | ~~Delivery events never published~~: **resolved** (K3); `customerId` added (#129), outbox done (#126) | — | — |
 | ~~B7~~ | ~~A BUSY driver can set themselves AVAILABLE~~: **resolved** (#107) | — | — |
 | ~~B8~~ | ~~Self-registered ADMIN~~: **resolved** (#105) | — | — |
 
 ---
 
-## 5. Current sprint — Phase 4 · driver app MVP (#99)
+## 5. Current sprint
 
-Goal: a driver signs in, goes online, receives the automatically assigned delivery, picks it up, delivers it and sends locations, through a real app, with a Maestro suite from the first commit. 0a, 0c and Phase 3 are done (#105–#110).
+**Next: Phase 7 · real-time tracking** (#32, #46, #60):
+1. Customer location UI on the order screen, reading `GET /tracking/delivery/:id`.
+2. SSE or WebSocket for the moving pin, with polling as the fallback.
+3. Stale-location handling (#32) and stopping location after completion.
 
-**Status (2026-10-02):** 0b and steps 1–6 ✅ (driver repo #15, #16; backend #111; verification in §2). Step 7 is half done: the driver suite runs on the isolated stack and in CI, but the customer business flow still uses driver stand-ins. Step 7 is next.
+Every step ships with unit tests and a Maestro assertion in the cross-app business flow.
+
+**Done (2026-10-04 → 10-06):**
+- Phase 4: #99, then #100 with restaurant #6 and #7.
+- Phase 5: no stand-ins (customer #20).
+- #98: #126 and #127.
+- #125: #128.
+- Phase 6 core, #5: #129, plus customer #22.
+
+The verification is in §2.
+
+### Phase 4 · driver app MVP (#99): done
+
+Goal: a driver signs in, goes online, receives the automatically assigned delivery, picks it up, delivers it and sends locations, through a real app, with a Maestro suite from the first commit.
+
+**Status:** every step ✅. Steps 1–6: driver repo #15, #16; backend #111. Step 7: customer #19. #99 is closed.
 
 | # | Issue | Work | Depends on | Done when |
 | --- | --- | --- | --- | --- |
 | 0b ✅ | B5 | Create the GitHub repos for the customer app and the driver app, push, set `BACKEND_REF` | owner's decision (name, visibility) | `ci.yml` green on GitHub; `e2e.yml` smoke green on a PR |
-| 1 | #99 | Scaffold `delivery-plus-driver-app` with the customer app's stack (Expo Router, API client, session, `useResource`, theme) and CI checks (typecheck, lint, vitest) | — | App builds for web; checks pass |
-| 2 | #99 | Sign in (DRIVER only) and first-use vehicle registration (`POST /drivers/register`) | 1 | Unit + Maestro |
-| 3 | #99 | Online/offline toggle (`me/online`, `me/offline`; shows 403 "on an active delivery" while BUSY) | 2 | Unit + Maestro |
-| 4 | #99 | Current delivery screen from `GET /deliveries/me/current` (204 → "waiting for a job"; polls while online): pickup, drop-off, items, the next action button | 3 | Unit + Maestro |
-| 5 | #99 | Actions pickup → start → complete (retry-safe on the server; the button follows `nextActions`) | 4 | Maestro: online → assigned → delivered |
+| 1 ✅ | #99 | Scaffold `delivery-plus-driver-app` with the customer app's stack (Expo Router, API client, session, `useResource`, theme) and CI checks (typecheck, lint, vitest) | — | App builds for web; checks pass |
+| 2 ✅ | #99 | Sign in (DRIVER only) and first-use vehicle registration (`POST /drivers/register`) | 1 | Unit + Maestro |
+| 3 ✅ | #99 | Online/offline toggle (`me/online`, `me/offline`; shows 403 "on an active delivery" while BUSY) | 2 | Unit + Maestro |
+| 4 ✅ | #99 | Current delivery screen from `GET /deliveries/me/current` (204 → "waiting for a job"; polls while online): pickup, drop-off, items, the next action button | 3 | Unit + Maestro |
+| 5 ✅ | #99 | Actions pickup → start → complete (retry-safe on the server; the button follows `nextActions`) | 4 | Maestro: online → assigned → delivered |
 | 6 ✅ | #99 | Send location while on a delivery (`POST /tracking/location`, foreground interval) | 5 | Unit; tracking reads show it |
-| 7 | #99 | E2E: driver-app Maestro suite on the isolated stack; the customer-app business flow drops its driver stand-ins (cross-app run) | 5 | Both suites green from a fresh environment |
+| 7 ✅ | #99 | E2E: driver-app Maestro suite on the isolated stack; the customer-app business flow drops its driver stand-ins (cross-app run) | 5 | Both suites green from a fresh environment |
 
 Acceptance for the sprint (from #99): Maestro online → receives delivery → pickup → start → complete against the E2E stack; the customer business E2E no longer uses driver stand-ins; CI runs typecheck, lint, unit tests and Maestro smoke on PRs (needs 0b).
 
@@ -167,13 +208,13 @@ flowchart LR
 
 | Milestone | Status | Open issues | Exit criterion (what "done" means) |
 | --- | --- | --- | --- |
-| Phase 1 · Hardening (remaining) | Core merged (#102). **New critical B8** | **new: registration role (B8)**; #42 checkout re-validation (canonical for #31 #40 #41 #47 #54); #53 cancellation + refund policy; #56 refund ledger; #18 stuck PROCESSING; #19 lease ownership; #59 owner data exposure. **New, unfiled (§9):** error-message leak on 500, cart lost update, atomic rate limiter | No privilege can be self-selected; every money path (cancel, refund, stuck payment) has a defined, tested end state |
-| Phase 2 · Kafka reliability | Core merged (#103) | #98 outbox; #23 event schema registry | Order and delivery events are published if and only if the DB change commits; payload contracts are versioned |
+| Phase 1 · Hardening (remaining) | Core merged (#102). **New critical B8** | **new: registration role (B8)**; #42 checkout re-validation (canonical for #31 #40 #41 #47 #54); #53 cancellation + refund policy; #56 refund ledger; #18 stuck PROCESSING; #19 lease ownership (#59 owner data exposure done in #123; #125 owner suspension in #128). **New, unfiled (§9):** error-message leak on 500, cart lost update, atomic rate limiter | No privilege can be self-selected; every money path (cancel, refund, stuck payment) has a defined, tested end state |
+| Phase 2 · Kafka reliability | Core merged (#103); #98 outbox done (#126, #127) | #23 event schema registry | Order and delivery events are published if and only if the DB change commits; payload contracts are versioned |
 | Phase 3 · Automatic dispatch + driver contracts | ✅ complete (#107–#110) | — (#33, #95, #96, #97 closed; milestone 0 open) | Orders reach a driver with no manual API call; the driver can find their job by API |
-| Phase 4 · Driver + restaurant clients | **Current sprint**: driver app MVP merged (steps 1–6); step 7 open | #99 driver app, #100 restaurant dashboard | Both apps ship with `testID`s, a Maestro smoke suite and CI from the first commit |
-| Phase 5 · Full business flow E2E | Partly (stand-ins) | #13 (notification assertion; app E2E in CI) | The business flow runs through three real UIs in CI; no API stand-ins left |
-| Phase 6 · Notifications + push | **Unblocked** (#103 merged) | #5, #50, #51 | `customerId` in payment/delivery payloads; a notification for every customer-visible stage; push on mobile |
-| Phase 7 · Real-time tracking | Blocked on Phase 4 | #32, #46, #60 | Moving driver pin from real driver locations (SSE/WebSocket, with polling as fallback); location stops after delivery |
+| Phase 4 · Driver + restaurant clients | ✅ complete (milestone closed) | — (#99, #100 closed) | Met: both apps ship with `testID`s, a Maestro suite and CI from the first commit |
+| Phase 5 · Full business flow E2E | ✅ locally (no stand-ins, customer #20); per-stage notification assertions (customer #22) | #13 (cross-app flows in GitHub CI: needs `CLIENT_APPS_READ_TOKEN`) | The business flow runs through three real UIs in CI |
+| Phase 6 · Notifications + push | ✅ core (#5 via backend #129) | #50, #51 | A notification for every customer-visible stage (met); resilient delivery; push on mobile |
+| Phase 7 · Real-time tracking | **Next** | #32, #46, #60 | Moving driver pin from real driver locations (SSE/WebSocket, with polling as fallback); location stops after delivery |
 | Phase 8 · Customer product features | Backlog | #34, #35, #48, #58 (+ avatar upload UI, reorder: app-only) | Refresh tokens, password recovery, opening hours, stock windows |
 | Phase 9 · Production readiness | Backlog (runs alongside) | #6, #7, #8, #14, #15, #16, #20, #30, #37, #38, #101. **New, unfiled (§9):** service identity instead of ADMIN system tokens, DB least privilege, TypeORM undefined-where guard, correlation ids across HTTP + Kafka | Staging + deploy pipeline; metrics, lag and DLQ alerts; tested backup/restore; graceful shutdown; per-service DB roles; non-root image |
 
@@ -181,11 +222,11 @@ flowchart LR
 
 1. ~~**Security + library (0a, 0c)**~~: done (#105, #106). ~~**0b (app repos on GitHub)**~~: done (private repos, CI green).
 2. ~~**Phase 3: dispatch + driver contracts**~~: complete (#107–#110). #33 came first so that auto-dispatch builds on an exclusive driver claim.
-3. **Phase 2 finish: outbox (#98)** in parallel with Phase 4. Auto-dispatch makes delivery depend on `order.ready_for_pickup` being published, so a lost event now means a stuck order. The outbox becomes necessary once dispatch is event-driven.
-4. **Phase 4 (now): driver app (MVP merged; location + cross-app run left), then restaurant dashboard.** The driver app first, because it supplies real location data for Phase 7 and replaces three of the five stand-in steps.
-5. **Phase 5: replace the stand-ins** as each client lands. The Maestro business flow becomes cross-app.
-6. **Phase 6: notifications.** Add `customerId` to the payloads (or look it up), fill the empty handlers (#5), then retries, preferences and push.
-7. **Phase 7: real-time tracking.** Only once drivers send locations. Start with SSE or WebSocket for the moving pin, keep polling as the fallback, and make the location stale-aware (#32).
+3. ~~**Phase 2 finish: outbox (#98)**~~: done (#126 outbox, #127 driver-release reconciliation). Auto-dispatch made delivery depend on `order.ready_for_pickup` being published, so the outbox became necessary.
+4. ~~**Phase 4: driver app, then restaurant app**~~: done (#99, #100). The driver app came first because it supplies real location data for Phase 7.
+5. ~~**Phase 5: replace the stand-ins**~~: done locally (customer #20); GitHub needs the `CLIENT_APPS_READ_TOKEN` secret.
+6. **Phase 6: notifications.** ~~`customerId` + handlers (#5)~~ done (#129); remaining: failed/cancelled-payment notifications, retries (#50), preferences (#51), push.
+7. **Phase 7: real-time tracking (next).** Drivers now send locations. Start with SSE or WebSocket for the moving pin, keep polling as the fallback, and make the location stale-aware (#32).
 8. **Phase 8: product features**, by user demand.
 9. **Phase 9 continuously,** with this priority: metrics + consumer-lag/DLQ alerts (#15) → graceful shutdown (#7) → HTTP timeouts (#6, #38) → backups (#16) → container/DB least privilege (#14) → staging + deploy pipeline. Production launch is gated on these, not on Phase 8.
 
@@ -198,7 +239,7 @@ flowchart LR
 
 (Design notes for each of these are in `delivery-plus/docs/books`, case studies 12, 13, 19 and 20 and ADR 0010.)
 
-**Why tracking moved behind operator clients:** real-time tracking needs (a) published delivery events, (b) a driver client sending locations, and (c) auto-dispatch so there's something to track without a person driving the API. None of those exist yet.
+**Why tracking moved behind operator clients:** real-time tracking needs (a) published delivery events, (b) a driver client sending locations, and (c) auto-dispatch so there's something to track without a person driving the API. All three exist now (#103, #99, #110).
 
 ---
 
@@ -207,17 +248,17 @@ flowchart LR
 | Aspect | Current state |
 | --- | --- |
 | **Framework** | Maestro CLI 2.11 (web support is beta; Chromium). Chosen because it drives React Native on Android/iOS and web with one YAML syntax. No other E2E framework existed in either repo |
-| **Supported clients** | Customer app (web :8083, control :8090) and driver app (web :8084, control :8091), **web builds**, on the same E2E stack. Android/iOS: flows use platform-neutral `id:` selectors (`testID` + `nativeID`), but no emulator job yet (B6). Restaurant: no client |
+| **Supported clients** | Customer app (web :8083, control :8090), driver app (web :8084, control :8091) and restaurant app (web :8085, control :8092), **web builds**, on the same E2E stack. Android/iOS: flows use platform-neutral `id:` selectors (`testID` + `nativeID`), but no emulator job yet (B6) |
 | **Environment** | Compose project `delivery-plus-e2e` (base + test + e2e overlays): isolated DB/Redis/Kafka/object-storage volumes, gateway `:3100`, storage `:9100`, `PAYMENT_SUCCESS_RATE=1`. Runs next to the dev stack. `npm run e2e:env:reset` = down → up → seed |
 | **Deterministic seed** | `npm run seed:e2e`: `qa.customer`, `qa.customer2`, `qa.restaurant`, `qa.driver` @`delivery-plus.test` (test-only password via `E2E_PASSWORD`, localhost-only guard); QA Kitchen (fixed prices; one sold-out item), QA Night Cafe (closed); scenarios S1 delivered, S2 payment declined, S3 ready without a delivery, S4 another customer's order; manifest of generated ids |
 | **Smoke (PR)** | login → Home · search → restaurant → menu · add → quantity → total · cart → checkout → order |
 | **Regression (nightly)** | waiting-for-driver state · declined → Failed · another customer's order refused · gateway outage → offline state → recovery with session intact |
-| **Business (nightly)** | customer UI orders → restaurant prepare/ready → dispatch → driver pickup/start/complete → customer UI: Delivered + notification |
+| **Business (nightly)** | customer UI orders → restaurant app prepares/readies → automatic dispatch → driver app goes online, pickup/start/complete → customer UI: Delivered + Alerts shows all five stage notifications for the order (#22). The runner builds and serves the driver and restaurant apps too |
 | **Runner** | `e2e/scripts/run.mjs`: builds web against the E2E gateway (`--clear`), serves it, hosts a control server for stand-ins/fault injection, clears rate-limit keys (E2E Redis only), runs flows asynchronously |
 | **Driver suites** | smoke: sign-in, online/offline, new driver + vehicle · business: online → auto-dispatched job → pickup → start → complete → customer order DELIVERED (customer + restaurant are API stand-ins) |
 | **CI** | Both apps: `ci.yml` (code checks, every push/PR) + `e2e.yml` (PR: smoke; nightly/manual: all). Starts the backend E2E stack from `BACKEND_REF`, seeds, runs headless. Smoke green on GitHub in both repos |
 | **Failure artifacts** | JUnit per flow, screenshots and debug output per flow (`e2e/.artifacts`), backend compose logs on failure. Uploaded 14 days |
-| **Known limits** | Maestro web cannot scroll react-native-web lists (it scrolls the window; RN-Web keeps `body` overflow hidden), so headless runs use a 430×1600 viewport. Restaurant/driver steps are API stand-ins (labelled in the flow). Checkout decline can't be triggered from the UI (no payment input); covered via seeded S2 |
+| **Known limits** | Maestro web cannot scroll react-native-web lists (it scrolls the window; RN-Web keeps `body` overflow hidden), so headless runs use a 430×1600 viewport. Cross-app flows are skipped on GitHub until `CLIENT_APPS_READ_TOKEN` exists. Checkout decline can't be triggered from the UI (no payment input); covered via seeded S2 |
 | **Runtime** | ~7.7 min for all 9 flows locally (login dominates) |
 
 **Rule for new work:** every client gets `testID`s, a Maestro suite and CI from its first commit. Every critical business flow gets E2E coverage before it is called done.
@@ -229,11 +270,11 @@ flowchart LR
 | Flow | Automatically verified | How | Not verified |
 | --- | --- | --- | --- |
 | Customer order cycle (sign in → browse → cart → checkout → order) | ✅ | UI (smoke) | — |
-| Restaurant prepares / ready | ⚠️ | API stand-in inside the business flow | No restaurant UI |
+| Restaurant prepares / ready | ✅ | Restaurant app UI inside the customer business flow (#20); restaurant suite 3/3 | — |
 | Dispatch + driver assignment | ✅ | Automatic dispatch (#110) in both apps' business flows | Driver choice is basic (F11) |
-| Driver pickup / in transit / delivered | ✅ / ⚠️ | Driver app UI (driver business flow); still an API stand-in in the customer business flow | Cross-app run; no location streaming |
+| Driver pickup / in transit / delivered | ✅ | Driver app UI in both the driver business flow and the customer cross-app flow (#19) | Real-time location streaming to the customer |
 | Customer sees delivery progress + Delivered | ✅ | UI (business flow, via polling) | Real-time push |
-| Notification after the order | ✅ | UI (Alerts shows "…has been confirmed") | Other notification types don't exist |
+| Notifications for every stage | ✅ | UI (Alerts shows payment received, confirmed, driver assigned, picked up, delivered for the order; #22) + `npm run e2e` (exactly one per stage) | Failed/cancelled payment; push |
 | Payment decline | ✅ | UI (seeded S2) + API | Declining from the UI |
 | Authorization (other customer's order) | ✅ | UI + live API checks | — |
 | Temporary outage | ✅ | UI with gateway stopped/started | Slow network / partial failures |
@@ -244,7 +285,7 @@ flowchart LR
 | Flow | Path | Protocol | Data owner / storage | Events | Auth boundary |
 | --- | --- | --- | --- | --- | --- |
 | Order | App → Gateway → order-service (→ cart, restaurant) → payment-service → order (HTTP sync + `payment.*` consumer, compare-and-set) → notification-service | HTTP + Kafka | order/payment DBs, cart in Redis | `order.*`, `payment.*` | JWT; ownership in each service |
-| Kitchen | (stand-in) owner → order-service | HTTP | order DB | `order.preparing`, `order.ready_for_pickup` (no consumers) | JWT owner + restaurant ownership |
+| Kitchen | restaurant app (owner) → order-service | HTTP | order DB | `order.preparing`, `order.ready_for_pickup` (no consumers) | JWT owner + restaurant ownership |
 | Delivery | owner → delivery-service (→ order-service with owner token; → driver-service with system token) → driver → delivery-service | HTTP + Kafka | delivery + driver DBs | `delivery.*` (created → completed/cancelled); order-service converges from them | Dispatch: admin or the order's restaurant owner; driver actions: assigned driver |
 | Tracking | driver → tracking-service → Redis (last location, 300s TTL); customer → tracking-service → delivery-service (user token) | HTTP (no push) | Redis | — | Driver: own location; customer: via delivery ownership |
 | Media / profile | App → user-service (presign) → S3 (direct POST to `pending/`) → user-service (confirm: byte check, content-addressed copy) → `avatarUrl` | HTTPS | S3 + user DB | — | JWT; key prefix bound to the requester |
@@ -261,9 +302,9 @@ flowchart LR
 | Durable idempotency | ✅ Wired, per consumer group in Redis; Redis AOF + volume (K5) | — |
 | DLQ / replay | ✅ `<topic>.dlq` + `npm run kafka:dlq` (K6) | — |
 | Event ids | ✅ Deterministic for payment, order and delivery (K2) | — |
-| Payloads | Order has `customerId`/`restaurantId`; payment and delivery don't | ✅ add (for notifications) |
+| Payloads | Order has `customerId`/`restaurantId`; payment and delivery carry optional `customerId` (#129) | — |
 | Partitioning / order | ✅ Keyed by `orderId` (K1) | — |
-| Outbox | None: order/delivery publish after commit (lost on crash); payment re-publishes via status markers | ✅ for order/delivery |
+| Outbox | ✅ order/delivery stage events in `outbox_events` with the write; a relay publishes (#126). Payment re-publishes via status markers | — |
 | Shutdown | No graceful shutdown hooks: stopped consumers linger in the group ~30 s | Nice to have |
 | Topic provisioning | Fixed: consumers ensure topics (default 1 partition, broker defaults) | Explicit partitions/replication in prod |
 | Double writers | HTTP sync + consumers for payment statuses; now safe (compare-and-set, tolerant consumer) | Keep until the outbox makes events authoritative |
@@ -280,7 +321,7 @@ Failure handling: presign policies enforce content type and size; confirm re-ver
 
 ### Codebase review (2026-10-01, found while writing the engineering library)
 
-Every row was checked in the code. **None of these is fixed yet, and none except the existing issue numbers is filed on GitHub.**
+Every row was checked in the code. F1, F2 and F10 are fixed (struck through below). The rest are open, and none except the existing issue numbers is filed on GitHub.
 
 | # | Finding | Severity | Where | Proposed fix | Tracked |
 | --- | --- | --- | --- | --- | --- |
@@ -293,7 +334,7 @@ Every row was checked in the code. **None of these is fixed yet, and none except
 | F7 | Rate limiter does `INCR` then `EXPIRE` (not atomic): a crash in between leaves a key with no TTL, and that user stays limited. The guard fails closed (5xx) when Redis is down | Low | `shared/src/redis/rate-limiter.service.ts`, `rate-limit.guard.ts` | One Lua script or `SET NX EX` + `INCR`; decide fail-open vs fail-closed per route | file (Phase 1) |
 | F8 | TypeORM 0.3 ignores `undefined` values in `find` where-clauses by default, so `findOne({ where: { id: undefined } })` returns an arbitrary row. No current bug was found, but it's a trap | Low (latent) | all TypeORM data sources | Set `invalidWhereValuesBehavior: { undefined: 'throw' }` in the shared TypeORM config | file (Phase 9) |
 | F9 | Correlation ids propagate only auth → user, not across other HTTP calls or Kafka | Low (ops) | service clients, Kafka producer | Forward `x-correlation-id` in every client; put it in event headers | #15 (extend) |
-| F10 | Notification handlers for `payment.completed` and `delivery.driver_assigned` are empty (no `customerId` in those payloads) | Product gap | `notification-service/src/services/notifications.service.ts` | Add `customerId` to the payloads, or look it up from order-service | #5 |
+| ~~F10~~ ✅ fixed (#129) | Notification handlers for `payment.completed` and `delivery.driver_assigned` are empty (no `customerId` in those payloads) | Product gap | `notification-service/src/services/notifications.service.ts` | Add `customerId` to the payloads, or look it up from order-service | #5 |
 | F11 | Dispatch picks the "most recently updated AVAILABLE driver" and ignores location: unfair and not nearest | Product gap | `driver-service` `findAvailable` | Fairness first (longest-idle), then nearest once orders have coordinates | #97 / Phase 7+ |
 
 ---
@@ -359,6 +400,17 @@ Every row was checked in the code. **None of these is fixed yet, and none except
 ---
 
 ## 13. Planning changes in this revision
+
+**2026-10-06 (sync after Phases 4–6):**
+- Phase 4 complete:
+  - #99 closed (customer #19).
+  - #100 restaurant app (restaurant #6, #7; backend #124).
+  - #59 (backend #123) and #125 (backend #128).
+- Phase 5: no stand-ins left in the business flow (customer #20). The cross-app flows need `CLIENT_APPS_READ_TOKEN` on GitHub (new blocker B9). B1 resolved.
+- #98 done: outbox (#126) and driver-release reconciliation (#127).
+- Phase 6 core: per-stage notifications (#5, backend #129). The business flow asserts them (customer #22). F10 fixed.
+- E2E runner retries a request on a closed keep-alive socket (customer #21, driver #19, restaurant #8).
+- §5 now points to Phase 7 real-time tracking.
 
 **2026-10-02 (#99 step 6):**
 - Location sharing merged (driver repo #16); B2 resolved. The customer app still has no location UI (Phase 7); step 7 (cross-app run) is next.
