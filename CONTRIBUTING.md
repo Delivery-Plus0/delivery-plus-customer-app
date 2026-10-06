@@ -2,7 +2,7 @@
 
 ## Before you start
 
-Read [.project-context/00-INDEX.md](.project-context/00-INDEX.md) first, then [planning.md](planning.md) for the current sprint. This app talks only to the Delivery Plus API gateway; the backend lives in [Yousefa7medmaher/delivery-plus](https://github.com/Yousefa7medmaher/delivery-plus) (default branch `dev`). Check its `docs/services/<name>.md` and public OpenAPI contract (`docs/openapi/delivery-plus-public.json`) before relying on an endpoint.
+Read [.project-context/00-INDEX.md](.project-context/00-INDEX.md) first, then [planning.md](planning.md) for the current sprint. This app talks only to the Delivery Plus API gateway; the backend lives in [Delivery-Plus0/delivery-plus](https://github.com/Delivery-Plus0/delivery-plus) (default branch `dev`). Check its `docs/services/<name>.md` and public OpenAPI contract (`docs/openapi/delivery-plus-public.json`) before relying on an endpoint.
 
 ## Workflow
 

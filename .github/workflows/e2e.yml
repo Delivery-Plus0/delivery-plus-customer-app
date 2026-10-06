@@ -38,16 +38,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BACKEND_REPOSITORY: ${{ vars.BACKEND_REPOSITORY || 'Yousefa7medmaher/delivery-plus' }}
+  BACKEND_REPOSITORY: ${{ vars.BACKEND_REPOSITORY || 'Delivery-Plus0/delivery-plus' }}
   BACKEND_REF: ${{ vars.BACKEND_REF || 'dev' }}
   MAESTRO_VERSION: 2.11.0
   E2E_API_URL: http://localhost:3100
   E2E_MANIFEST: ${{ github.workspace }}/backend/e2e-seed-manifest.json
   SUITE: ${{ github.event_name == 'pull_request' && 'smoke' || inputs.suite || 'all' }}
-  DRIVER_APP_REPOSITORY: ${{ vars.DRIVER_APP_REPOSITORY || 'Yousefa7medmaher/delivery-plus-driver-app' }}
+  DRIVER_APP_REPOSITORY: ${{ vars.DRIVER_APP_REPOSITORY || 'Delivery-Plus0/delivery-plus-driver-app' }}
   DRIVER_APP_REF: ${{ vars.DRIVER_APP_REF || 'dev' }}
   DRIVER_APP_DIR: ${{ github.workspace }}/driver-app
-  RESTAURANT_APP_REPOSITORY: ${{ vars.RESTAURANT_APP_REPOSITORY || 'Yousefa7medmaher/delivery-plus-restaurant-app' }}
+  RESTAURANT_APP_REPOSITORY: ${{ vars.RESTAURANT_APP_REPOSITORY || 'Delivery-Plus0/delivery-plus-restaurant-app' }}
   RESTAURANT_APP_REF: ${{ vars.RESTAURANT_APP_REF || 'dev' }}
   RESTAURANT_APP_DIR: ${{ github.workspace }}/restaurant-app
   HAS_CLIENT_APPS_TOKEN: ${{ secrets.CLIENT_APPS_READ_TOKEN != '' }}

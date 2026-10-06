@@ -16,7 +16,7 @@ Please report:
 - deep links or navigation that bypass sign-in
 - unsafe handling of server-provided content (e.g. rendering untrusted HTML)
 
-Authorization is enforced by the backend; an app-side check that can be bypassed is still worth reporting, but the server-side issue belongs in the [backend repository](https://github.com/Yousefa7medmaher/delivery-plus/blob/dev/SECURITY.md).
+Authorization is enforced by the backend; an app-side check that can be bypassed is still worth reporting, but the server-side issue belongs in the [backend repository](https://github.com/Delivery-Plus0/delivery-plus/blob/dev/SECURITY.md).
 
 Not considered vulnerabilities: the development API URL in `.env.example`, and test-only QA credentials used by the E2E suites against a local stack.
 
