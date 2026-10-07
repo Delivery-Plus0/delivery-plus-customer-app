@@ -1,4 +1,5 @@
-import { apiGet, apiPatch } from '@/services/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/services/api';
+import type { PresignedUpload } from '@/utils/image-upload';
 
 /** Mirrors user-service `UserProfile` (public fields). */
 export type UserProfile = {
@@ -25,4 +26,17 @@ export async function fetchMyProfile(): Promise<UserProfile> {
 
 export async function updateMyProfile(payload: UpdateProfileRequest): Promise<UserProfile> {
   return apiPatch<UserProfile>('/api/users/me', payload, true);
+}
+
+/** Profile photo (#150): presign, upload straight to storage, confirm; or remove it. */
+export async function createAvatarUploadUrl(contentType: string): Promise<PresignedUpload> {
+  return apiPost<PresignedUpload>('/api/users/me/avatar/image-upload-url', { contentType }, true);
+}
+
+export async function confirmAvatarUpload(objectKey: string): Promise<UserProfile> {
+  return apiPost<UserProfile>('/api/users/me/avatar/confirm', { objectKey }, true);
+}
+
+export async function removeMyAvatar(): Promise<UserProfile> {
+  return apiDelete<UserProfile>('/api/users/me/avatar', true);
 }

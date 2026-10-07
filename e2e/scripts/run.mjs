@@ -63,6 +63,7 @@ const SUITES = {
   smoke: ['smoke/01-login.yaml', 'smoke/02-browse.yaml', 'smoke/03-cart.yaml', 'smoke/04-checkout.yaml'],
   regression: [
     'regression/order-awaiting-driver.yaml',
+    'regression/profile-photo.yaml',
     'regression/order-payment-failed.yaml',
     'regression/unauthorized-order.yaml',
     'regression/offline-recovery.yaml',
@@ -220,6 +221,25 @@ async function waitForGateway(up, timeoutMs = 90_000) {
 }
 
 const actions = {
+  // Stand-in for the photo picker (#150), which Maestro web can't drive: upload a real 1×1 PNG as the
+  // QA customer's avatar through the same presign → storage → confirm API the app uses.
+  'profile/upload-avatar': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    const presigned = await api('POST', '/api/users/me/avatar/image-upload-url', customer, { contentType: 'image/png' });
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const form = new FormData();
+    for (const [key, value] of Object.entries(presigned.fields)) form.append(key, value);
+    form.append('file', new Blob([png], { type: 'image/png' }), 'avatar.png');
+    const upload = await fetch(presigned.uploadUrl, { method: 'POST', body: form });
+    if (!upload.ok) throw new Error(`Storage upload failed: ${upload.status} ${await upload.text()}`);
+    const profile = await api('POST', '/api/users/me/avatar/confirm', customer, { objectKey: presigned.objectKey });
+    if (!profile.avatarUrl) throw new Error('Avatar not attached');
+  },
+  // Fixture: the QA customer starts without a photo.
+  'profile/clear-avatar': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    await api('DELETE', '/api/users/me/avatar', customer);
+  },
   // Read-only, as the customer: the order just placed in the customer app (newest of theirs, CONFIRMED),
   // so the other apps' cards can be addressed by its id. Changes nothing.
   'order/placed': async () => {

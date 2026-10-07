@@ -1,0 +1,58 @@
+url: ${APP_URL}
+name: Profile photo - the sheet offers a photo, an uploaded photo shows, and removing it brings back the initials
+tags:
+  - regression
+---
+# Fixture: no photo to start with.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: profile/clear-avatar
+- runFlow: ../_shared/login.yaml
+- openLink: ${APP_URL}/profile
+- extendedWaitUntil:
+    visible:
+      id: profile-avatar-initials
+    timeout: 20000
+
+# The avatar opens the photo sheet (library on web; the camera is native only).
+- tapOn:
+    id: profile-avatar
+- extendedWaitUntil:
+    visible:
+      id: photo-sheet
+    timeout: 10000
+- assertVisible:
+    id: photo-library
+- assertNotVisible:
+    id: photo-remove
+- tapOn:
+    id: photo-sheet-close
+
+# The picker can't be automated on web: upload a real image through the same API, then reload.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: profile/upload-avatar
+- openLink: ${APP_URL}/profile
+- extendedWaitUntil:
+    visible:
+      id: profile-avatar-image
+    timeout: 20000
+
+# Remove it from the sheet: the initials are back and the change is confirmed.
+- tapOn:
+    id: profile-avatar
+- extendedWaitUntil:
+    visible:
+      id: photo-remove
+    timeout: 10000
+- tapOn:
+    id: photo-remove
+- extendedWaitUntil:
+    visible:
+      id: profile-notice
+    timeout: 15000
+- assertVisible: 'Photo removed\.'
+- assertVisible:
+    id: profile-avatar-initials

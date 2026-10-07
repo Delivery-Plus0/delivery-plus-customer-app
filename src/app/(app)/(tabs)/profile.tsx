@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
@@ -8,13 +8,14 @@ import { Card } from '@/components/ui/card';
 import { FormTextInput } from '@/components/ui/form-text-input';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
+import { Sheet } from '@/components/ui/sheet';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { clearSession, useAuthSession } from '@/services/session';
 import type { UserProfile } from '@/services/users';
-import { saveProfile, useProfile } from '@/state/profile';
+import { saveProfile, useProfile, changeAvatar, removeAvatar } from '@/state/profile';
 import { PHONE_HINT, formatPhone, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
 import { confirm } from '@/utils/confirm';
 
@@ -22,6 +23,7 @@ export default function ProfileScreen() {
   const profile = useProfile();
   const { session } = useAuthSession();
   const [editing, setEditing] = useState(false);
+  const [photoSheet, setPhotoSheet] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const signOut = async () => {
@@ -95,7 +97,7 @@ export default function ProfileScreen() {
           }
         >
           <View style={styles.identity}>
-            <Avatar profile={profile.data} />
+            <Avatar profile={profile.data} onPress={() => setPhotoSheet(true)} />
             <View style={styles.flex}>
               <ThemedText type="subtitle" numberOfLines={1}>
                 {profile.data.fullName}
@@ -106,7 +108,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {notice ? <InlineAlert tone="success" message={notice} onDismiss={() => setNotice(null)} /> : null}
+          {notice ? <InlineAlert tone="success" message={notice} onDismiss={() => setNotice(null)} testID="profile-notice" /> : null}
 
           {editing ? (
             <EditProfileForm
@@ -142,11 +144,54 @@ export default function ProfileScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {photoSheet && profile.data ? (
+        <PhotoSheet
+          profile={profile.data}
+          onClose={() => setPhotoSheet(false)}
+          onDone={(message) => {
+            setPhotoSheet(false);
+            setNotice(message);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-function Avatar({ profile }: { profile: UserProfile }) {
+/** Change or remove the profile photo (#150). Camera only on native; the web picks a file. */
+function PhotoSheet({ profile, onClose, onDone }: { profile: UserProfile; onClose: () => void; onDone: (message: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(action: () => Promise<unknown>, message: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await action();
+      if (result !== null) onDone(message);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'That did not go through. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet visible title="Profile photo" onClose={onClose} testID="photo-sheet">
+      {error ? <InlineAlert message={error} testID="photo-error" /> : null}
+      <AppButton testID="photo-library" title="Choose from library" icon="person" loading={busy} onPress={() => void run(() => changeAvatar('library'), 'Photo updated.')} />
+      {Platform.OS !== 'web' ? (
+        <AppButton testID="photo-camera" title="Take a photo" variant="secondary" disabled={busy} onPress={() => void run(() => changeAvatar('camera'), 'Photo updated.')} />
+      ) : null}
+      {profile.avatarUrl ? (
+        <AppButton testID="photo-remove" title="Remove photo" variant="danger" disabled={busy} onPress={() => void run(() => removeAvatar(), 'Photo removed.')} />
+      ) : null}
+    </Sheet>
+  );
+}
+
+function Avatar({ profile, onPress }: { profile: UserProfile; onPress: () => void }) {
   const initials = profile.fullName
     .split(/\s+/)
     .filter(Boolean)
@@ -155,15 +200,23 @@ function Avatar({ profile }: { profile: UserProfile }) {
     .join('');
 
   return (
-    <View style={styles.avatar}>
+    <Pressable
+      style={styles.avatar}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={profile.avatarUrl ? 'Change or remove your photo' : 'Add a profile photo'}
+      testID="profile-avatar"
+      nativeID="profile-avatar">
       {profile.avatarUrl ? (
-        <Image source={profile.avatarUrl} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
+        <View style={styles.avatarImage} testID="profile-avatar-image" nativeID="profile-avatar-image">
+          <Image source={profile.avatarUrl} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
+        </View>
       ) : (
-        <ThemedText type="heading" style={styles.avatarText}>
+        <ThemedText type="heading" style={styles.avatarText} testID="profile-avatar-initials" nativeID="profile-avatar-initials">
           {initials || '?'}
         </ThemedText>
       )}
-    </View>
+    </Pressable>
   );
 }
 
