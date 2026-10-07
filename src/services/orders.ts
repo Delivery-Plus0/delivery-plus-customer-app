@@ -30,7 +30,18 @@ export type Order = {
   items: OrderItem[];
   createdAt?: string;
   updatedAt?: string;
+  /** Who ended an unsuccessful order (#143); null while it is going, after delivery, or for old orders. */
+  cancelledBy?: 'CUSTOMER' | 'RESTAURANT' | 'SYSTEM' | 'PAYMENT' | null;
+  /** The backend's own sentence for why it ended; shown as-is, never written by the app. */
+  cancellationReason?: string | null;
+  /** From the backend's payment events; null when not known (e.g. orders from before #143). */
+  paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | null;
 };
+
+/** GET /api/orders?status= groups (#143): cancelled covers CANCELLED and FAILED. */
+export type OrderFilter = 'active' | 'completed' | 'cancelled';
+
+export const ORDERS_PAGE_SIZE = 20;
 
 export type OrderListResponse = {
   items: Order[];
@@ -71,6 +82,13 @@ export async function createOrder(idempotencyKey?: string): Promise<Order> {
 export async function fetchMyOrders(): Promise<Order[]> {
   const response = await apiGet<OrderListResponse>('/api/orders', true);
   return response.items ?? [];
+}
+
+/** One page of the customer's orders, newest first, optionally filtered. */
+export async function fetchOrdersPage(filter: OrderFilter | null, page = 1, limit = ORDERS_PAGE_SIZE): Promise<OrderListResponse> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (filter) query.set('status', filter);
+  return apiGet<OrderListResponse>(`/api/orders?${query.toString()}`, true);
 }
 
 export async function fetchOrderById(orderId: string): Promise<Order> {

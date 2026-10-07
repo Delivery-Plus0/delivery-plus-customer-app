@@ -24,6 +24,7 @@ import { useDeliveryTracking } from '@/state/tracking';
 import { confirm } from '@/utils/confirm';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
 import { describeOrderPhase, searchingFor } from '@/utils/order-phase';
+import { outcomeReason, paymentStatusLabel } from '@/utils/order-outcome';
 
 export default function OrderDetailScreen() {
   const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
@@ -122,6 +123,10 @@ export default function OrderDetailScreen() {
 
         <OrderPhaseCard phase={phase} note={phaseNote} />
 
+        {outcomeReason(current) ? (
+          <InlineAlert testID="order-outcome" tone="info" message={outcomeReason(current) ?? ''} />
+        ) : null}
+
         {deliveryUnavailable ? (
           <InlineAlert
             testID="delivery-unavailable"
@@ -170,7 +175,17 @@ export default function OrderDetailScreen() {
           <View style={styles.divider} />
           <View style={styles.rowBetween}>
             <ThemedText type="heading">Total</ThemedText>
-            <ThemedText type="heading">{formatMoney(current.totalAmount)}</ThemedText>
+            <ThemedText type="heading" testID="order-total">
+              {formatMoney(current.totalAmount)}
+            </ThemedText>
+          </View>
+          <View style={styles.rowBetween}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Payment
+            </ThemedText>
+            <ThemedText type="small" testID="order-payment-status" nativeID="order-payment-status">
+              {paymentStatusLabel(current)}
+            </ThemedText>
           </View>
         </Card>
 

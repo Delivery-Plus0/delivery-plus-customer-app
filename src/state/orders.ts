@@ -1,5 +1,14 @@
 import { useResource } from '@/hooks/use-resource';
-import { cancelOrder, fetchMyOrders, fetchOrderById, isActiveOrder, type Order } from '@/services/orders';
+import {
+  cancelOrder,
+  fetchMyOrders,
+  fetchOrderById,
+  fetchOrdersPage,
+  isActiveOrder,
+  type Order,
+  type OrderFilter,
+  type OrderListResponse,
+} from '@/services/orders';
 import { invalidateResources, setResourceData } from '@/state/resource-cache';
 
 /** Poll an in-flight order this often while its screen is focused. */
@@ -7,6 +16,12 @@ const ACTIVE_ORDER_POLL_MS = 10_000;
 
 export function useOrders() {
   return useResource<Order[]>('orders', fetchMyOrders);
+}
+
+/** First page of the Orders tab for a filter (#143); later pages are appended by the screen. */
+export function useOrdersPage(filter: OrderFilter | null) {
+  // Under the 'orders' prefix, so placing or cancelling an order (invalidateResources('orders')) refreshes it.
+  return useResource<OrderListResponse>(`orders:list:${filter ?? 'all'}`, () => fetchOrdersPage(filter));
 }
 
 export function useOrder(id: string | undefined) {
