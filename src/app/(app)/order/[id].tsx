@@ -6,6 +6,7 @@ import { DriverCard } from '@/components/driver-card';
 import { DriverLocationCard } from '@/components/driver-location-card';
 import { OrderPhaseCard } from '@/components/order-phase-card';
 import { OrderStatusBadge } from '@/components/order-status';
+import { RateDriverCard } from '@/components/rate-driver-card';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
@@ -129,6 +130,10 @@ export default function OrderDetailScreen() {
         ) : null}
 
         {showDriver && driver ? <DriverCard driver={driver} /> : null}
+
+        {delivery.data?.status === 'DELIVERED' && delivery.data.driverId ? (
+          <RateDriverCard deliveryId={delivery.data.id} driverName={driver?.displayName} />
+        ) : null}
 
         {live ? <DriverLocationCard tracking={tracking} /> : null}
 
