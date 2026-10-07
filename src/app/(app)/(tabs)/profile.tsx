@@ -208,7 +208,7 @@ function Avatar({ profile, onPress }: { profile: UserProfile; onPress: () => voi
       testID="profile-avatar"
       nativeID="profile-avatar">
       {profile.avatarUrl ? (
-        <View testID="profile-avatar-image" nativeID="profile-avatar-image">
+        <View style={styles.avatarImage} testID="profile-avatar-image" nativeID="profile-avatar-image">
           <Image source={profile.avatarUrl} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
         </View>
       ) : (
