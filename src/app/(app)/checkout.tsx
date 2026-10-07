@@ -15,6 +15,7 @@ import { submitCheckout } from '@/services/checkout';
 import { reloadCart, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
 import { invalidateResources } from '@/state/resource-cache';
+import { useOrderQuote } from '@/state/orders';
 import { formatMoney } from '@/utils/format';
 
 function createIdempotencyKey(prefix: string): string {
@@ -24,6 +25,9 @@ function createIdempotencyKey(prefix: string): string {
 export default function CheckoutScreen() {
   const cart = useCart();
   const restaurant = useRestaurant(cart.data?.restaurantId ?? undefined);
+  // The fee and total come from the backend's quote of this exact cart, never from app math (#145).
+  const cartSignature = cart.data?.items.length ? cart.data.items.map((item) => `${item.menuItemId}x${item.quantity}`).join(',') : null;
+  const quote = useOrderQuote(cartSignature);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
@@ -109,9 +113,10 @@ export default function CheckoutScreen() {
   ) : (
     <AppButton
       testID="checkout-place-order"
-      title={`Place order · ${formatMoney(cart.data?.total)}`}
+      title={quote.data ? `Place order · ${formatMoney(quote.data.totalAmount)}` : 'Place order'}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
+      disabled={!quote.data}
       accessibilityHint="Creates your order and charges the total shown"
     />
   );
@@ -151,10 +156,42 @@ export default function CheckoutScreen() {
               </View>
             ))}
             <View style={styles.divider} />
-            <View style={styles.itemRow}>
-              <ThemedText type="heading">Total</ThemedText>
-              <ThemedText type="heading">{formatMoney(cart.data?.total)}</ThemedText>
-            </View>
+            {quote.data ? (
+              <>
+                <View style={styles.itemRow}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Subtotal
+                  </ThemedText>
+                  <ThemedText type="small" testID="checkout-subtotal" nativeID="checkout-subtotal">
+                    {formatMoney(quote.data.subtotalAmount)}
+                  </ThemedText>
+                </View>
+                <View style={styles.itemRow}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Delivery fee
+                  </ThemedText>
+                  <ThemedText type="small" testID="checkout-delivery-fee" nativeID="checkout-delivery-fee">
+                    {formatMoney(quote.data.deliveryFee)}
+                  </ThemedText>
+                </View>
+                <View style={styles.itemRow}>
+                  <ThemedText type="heading">Total</ThemedText>
+                  <ThemedText type="heading" testID="checkout-total" nativeID="checkout-total">
+                    {formatMoney(quote.data.totalAmount)}
+                  </ThemedText>
+                </View>
+              </>
+            ) : quote.error ? (
+              <InlineAlert
+                testID="checkout-quote-error"
+                message="We couldn't load the delivery fee, so the total isn't known yet."
+                onDismiss={() => void quote.refresh()}
+              />
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary" testID="checkout-quote-loading">
+                Working out the delivery fee…
+              </ThemedText>
+            )}
           </Card>
         ) : null}
 

@@ -38,7 +38,16 @@ tags:
     visible:
       id: checkout-place-order
     timeout: 15000
-- assertVisible: 'Place order · EGP.7\.00'
+# The fee and total come from the backend's quote (#145): EGP 7.00 + EGP 25.00 (the default fee).
+- extendedWaitUntil:
+    visible:
+      id: checkout-delivery-fee
+      text: 'EGP.25\.00'
+    timeout: 15000
+- assertVisible:
+    id: checkout-total
+    text: 'EGP.32\.00'
+- assertVisible: 'Place order · EGP.32\.00'
 - tapOn:
     id: checkout-place-order
 # Real order + payment through the gateway; the app routes to the order it created.
