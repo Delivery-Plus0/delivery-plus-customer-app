@@ -15,6 +15,7 @@ import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { clearSession, useAuthSession } from '@/services/session';
 import type { UserProfile } from '@/services/users';
 import { saveProfile, useProfile } from '@/state/profile';
+import { PHONE_HINT, formatPhone, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
 import { confirm } from '@/utils/confirm';
 
 export default function ProfileScreen() {
@@ -120,7 +121,7 @@ export default function ProfileScreen() {
             <Card>
               <DetailRow icon="person" label="Full name" value={profile.data.fullName} />
               <DetailRow icon="mail" label="Email" value={profile.data.email} />
-              <DetailRow icon="phone" label="Phone" value={profile.data.phone} placeholder="Add a phone number" />
+              <DetailRow icon="phone" label="Phone" value={formatPhone(profile.data.phone)} placeholder="Add a phone number" />
               <DetailRow
                 icon="location"
                 label="Delivery address"
@@ -210,13 +211,15 @@ function EditProfileForm({
   const [error, setError] = useState<string | null>(null);
 
   const nameError = fullName.trim() ? undefined : 'Full name is required';
+  const phoneProblem = phoneError(phone);
 
   const handleSave = async () => {
-    if (nameError) return;
+    if (nameError || phoneProblem) return;
     setError(null);
     setSaving(true);
     try {
-      await saveProfile({ fullName: fullName.trim(), phone: phone.trim(), address: address.trim() });
+      // Blank clears the phone; anything else is sent as E.164 (#152).
+      await saveProfile({ fullName: fullName.trim(), phone: normalizeEgyptianMobile(phone) ?? '', address: address.trim() });
       onSaved();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save your profile.');
@@ -245,6 +248,8 @@ function EditProfileForm({
         autoComplete="tel"
         textContentType="telephoneNumber"
         placeholder="Optional"
+        hint={PHONE_HINT}
+        error={phoneProblem}
       />
       <FormTextInput
         label="Delivery address"

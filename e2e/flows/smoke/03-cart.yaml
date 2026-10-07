@@ -17,7 +17,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: cart-subtotal
-      text: '\$10\.00'
+      text: 'EGP.10\.00'
     timeout: 15000
 - tapOn:
     id: cart-qty-QA Burger-increase
@@ -29,7 +29,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: cart-subtotal
-      text: '\$20\.00'
+      text: 'EGP.20\.00'
     timeout: 10000
 # Removing the last unit empties the cart (leaves no state behind for other flows).
 - tapOn:

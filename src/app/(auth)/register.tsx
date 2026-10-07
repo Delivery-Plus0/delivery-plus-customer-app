@@ -11,15 +11,16 @@ import { Spacing } from '@/constants/theme';
 import { ApiError } from '@/services/api';
 import { registerAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
+import { PHONE_HINT, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
 
-type Field = 'fullName' | 'email' | 'password';
+type Field = 'fullName' | 'email' | 'phone' | 'password';
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [touched, setTouched] = useState<Record<Field, boolean>>({ fullName: false, email: false, password: false });
+  const [touched, setTouched] = useState<Record<Field, boolean>>({ fullName: false, email: false, phone: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,6 +32,7 @@ export default function RegisterScreen() {
   const errors: Record<Field, string | undefined> = {
     fullName: fullName.trim() ? undefined : 'Full name is required',
     email: !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined,
+    phone: phoneError(phone),
     password: !password
       ? 'Password is required'
       : password.length < 8
@@ -51,7 +53,8 @@ export default function RegisterScreen() {
         email: email.trim(),
         password,
         fullName: fullName.trim(),
-        phone: phone.trim() || undefined,
+        // The API stores E.164; send it normalized (#152).
+        phone: normalizeEgyptianMobile(phone) ?? undefined,
         role: 'CUSTOMER',
       });
       await setSession(auth.accessToken);
@@ -116,6 +119,9 @@ export default function RegisterScreen() {
         label="Phone"
         value={phone}
         onChangeText={setPhone}
+        onBlur={markTouched('phone')}
+        error={visibleError('phone')}
+        hint={PHONE_HINT}
         placeholder="Optional"
         keyboardType="phone-pad"
         autoComplete="tel"
