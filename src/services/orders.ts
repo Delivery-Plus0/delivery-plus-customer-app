@@ -36,7 +36,14 @@ export type Order = {
   cancellationReason?: string | null;
   /** From the backend's payment events; null when not known (e.g. orders from before #143). */
   paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | null;
+  /** The items as priced at checkout (#145); totalAmount = subtotalAmount + deliveryFee. */
+  subtotalAmount?: string | null;
+  /** The delivery fee applied at checkout (#145); 0 for orders from before fees. */
+  deliveryFee?: string | null;
 };
+
+/** GET /api/orders/quote (#145): what checking out the current cart costs, priced by the backend. */
+export type OrderQuote = { subtotalAmount: string; deliveryFee: string; totalAmount: string; currency: 'EGP' };
 
 /** GET /api/orders?status= groups (#143): cancelled covers CANCELLED and FAILED. */
 export type OrderFilter = 'active' | 'completed' | 'cancelled';
@@ -89,6 +96,10 @@ export async function fetchOrdersPage(filter: OrderFilter | null, page = 1, limi
   const query = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (filter) query.set('status', filter);
   return apiGet<OrderListResponse>(`/api/orders?${query.toString()}`, true);
+}
+
+export async function fetchOrderQuote(): Promise<OrderQuote> {
+  return apiGet<OrderQuote>('/api/orders/quote', true);
 }
 
 export async function fetchOrderById(orderId: string): Promise<Order> {

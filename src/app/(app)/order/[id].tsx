@@ -173,6 +173,26 @@ export default function OrderDetailScreen() {
             </View>
           ))}
           <View style={styles.divider} />
+          {current.deliveryFee != null && current.subtotalAmount != null ? (
+            <>
+              <View style={styles.rowBetween}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Subtotal
+                </ThemedText>
+                <ThemedText type="small" testID="order-subtotal">
+                  {formatMoney(current.subtotalAmount)}
+                </ThemedText>
+              </View>
+              <View style={styles.rowBetween}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Delivery fee
+                </ThemedText>
+                <ThemedText type="small" testID="order-delivery-fee" nativeID="order-delivery-fee">
+                  {formatMoney(current.deliveryFee)}
+                </ThemedText>
+              </View>
+            </>
+          ) : null}
           <View style={styles.rowBetween}>
             <ThemedText type="heading">Total</ThemedText>
             <ThemedText type="heading" testID="order-total">

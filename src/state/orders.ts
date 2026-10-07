@@ -4,10 +4,12 @@ import {
   fetchMyOrders,
   fetchOrderById,
   fetchOrdersPage,
+  fetchOrderQuote,
   isActiveOrder,
   type Order,
   type OrderFilter,
   type OrderListResponse,
+  type OrderQuote,
 } from '@/services/orders';
 import { invalidateResources, setResourceData } from '@/state/resource-cache';
 
@@ -22,6 +24,14 @@ export function useOrders() {
 export function useOrdersPage(filter: OrderFilter | null) {
   // Under the 'orders' prefix, so placing or cancelling an order (invalidateResources('orders')) refreshes it.
   return useResource<OrderListResponse>(`orders:list:${filter ?? 'all'}`, () => fetchOrdersPage(filter));
+}
+
+/**
+ * The backend's price for checking out the cart (#145). Keyed by the cart's contents so a changed cart
+ * is re-quoted; pass null while there is no cart.
+ */
+export function useOrderQuote(cartSignature: string | null) {
+  return useResource<OrderQuote>(cartSignature ? `quote:${cartSignature}` : null, fetchOrderQuote, { staleTimeMs: 30_000 });
 }
 
 export function useOrder(id: string | undefined) {
