@@ -1,20 +1,32 @@
 import { router } from 'expo-router';
-import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 
 import { OrderCard } from '@/components/order-card';
 import { ThemedText } from '@/components/themed-text';
+import { AppButton } from '@/components/ui/app-button';
+import { InlineAlert } from '@/components/ui/inline-alert';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
-import { BrandColors, Spacing } from '@/constants/theme';
-import { isActiveOrder, type Order } from '@/services/orders';
-import { useOrders } from '@/state/orders';
+import { BrandColors, Radius, Spacing } from '@/constants/theme';
+import { ApiError } from '@/services/api';
+import { fetchOrdersPage, isActiveOrder, type Order, type OrderFilter } from '@/services/orders';
+import { useOrdersPage } from '@/state/orders';
+import { ORDER_FILTER_OPTIONS, mergeOrderPages } from '@/utils/order-outcome';
 
-function buildSections(orders: Order[]) {
-  const sorted = [...orders].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-  const active = sorted.filter(isActiveOrder);
-  const past = sorted.filter((order) => !isActiveOrder(order));
+const EMPTY_TITLES: Record<string, string> = {
+  all: 'No orders yet',
+  active: 'Nothing on the way',
+  completed: 'No delivered orders yet',
+  cancelled: 'No cancelled or failed orders',
+};
 
+function buildSections(orders: Order[], filter: OrderFilter | null) {
+  // The backend already returns newest first; "All" groups what is still going above the rest.
+  if (filter) return orders.length ? [{ title: '', data: orders }] : [];
+  const active = orders.filter(isActiveOrder);
+  const past = orders.filter((order) => !isActiveOrder(order));
   return [
     ...(active.length ? [{ title: 'In progress', data: active }] : []),
     ...(past.length ? [{ title: 'Past orders', data: past }] : []),
@@ -22,61 +34,114 @@ function buildSections(orders: Order[]) {
 }
 
 export default function OrdersScreen() {
-  const orders = useOrders();
-  const header = <ScreenHeader title="Orders" />;
-
-  if (orders.isLoading) {
-    return (
-      <Screen>
-        {header}
-        <SkeletonList count={4} itemHeight={80} />
-      </Screen>
-    );
-  }
-
-  if (!orders.data) {
-    return (
-      <Screen>
-        {header}
-        <ErrorState error={orders.error} onRetry={() => void orders.refresh()} />
-      </Screen>
-    );
-  }
+  const [filter, setFilter] = useState<OrderFilter | null>(null);
 
   return (
     <Screen>
-      {header}
-      <SectionList
-        sections={buildSections(orders.data)}
-        keyExtractor={(order) => order.id}
-        renderItem={({ item }) => <OrderCard order={item} />}
-        renderSectionHeader={({ section }) => (
+      <ScreenHeader title="Orders" />
+      <View style={styles.filters} accessibilityRole="tablist">
+        {ORDER_FILTER_OPTIONS.map((option) => {
+          const selected = option.key === filter;
+          return (
+            <Pressable
+              key={option.testID}
+              testID={option.testID}
+              nativeID={option.testID}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              onPress={() => setFilter(option.key)}
+              style={[styles.chip, selected && styles.chipSelected]}>
+              <ThemedText type="smallBold" style={selected ? styles.chipTextSelected : undefined}>
+                {option.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+      {/* Keyed by filter: switching filters starts again from page 1. */}
+      <OrdersList key={filter ?? 'all'} filter={filter} />
+    </Screen>
+  );
+}
+
+function OrdersList({ filter }: { filter: OrderFilter | null }) {
+  const first = useOrdersPage(filter);
+  const [more, setMore] = useState<Order[][]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+
+  if (first.isLoading) return <SkeletonList count={4} itemHeight={80} />;
+  if (!first.data) return <ErrorState error={first.error} onRetry={() => void first.refresh()} />;
+
+  const orders = mergeOrderPages([first.data.items ?? [], ...more]);
+  const total = first.data.total ?? orders.length;
+
+  async function refresh() {
+    setMore([]);
+    setMoreError(null);
+    await first.refresh();
+  }
+
+  async function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const next = await fetchOrdersPage(filter, more.length + 2);
+      setMore((pages) => [...pages, next.items ?? []]);
+    } catch (caught) {
+      setMoreError(caught instanceof ApiError ? caught.message : 'Could not load more orders.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  return (
+    <SectionList
+      sections={buildSections(orders, filter)}
+      keyExtractor={(order) => order.id}
+      renderItem={({ item }) => <OrderCard order={item} />}
+      renderSectionHeader={({ section }) =>
+        section.title ? (
           <ThemedText type="caption" themeColor="textSecondary" style={styles.sectionTitle}>
             {section.title.toUpperCase()}
           </ThemedText>
-        )}
-        ItemSeparatorComponent={Separator}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={orders.refreshing}
-            onRefresh={() => void orders.refresh()}
-            tintColor={BrandColors.primary}
-            colors={[BrandColors.primary]}
-          />
-        }
-        ListEmptyComponent={
+        ) : null
+      }
+      ItemSeparatorComponent={Separator}
+      stickySectionHeadersEnabled={false}
+      contentContainerStyle={styles.list}
+      refreshControl={
+        <RefreshControl
+          refreshing={first.refreshing}
+          onRefresh={() => void refresh()}
+          tintColor={BrandColors.primary}
+          colors={[BrandColors.primary]}
+        />
+      }
+      ListFooterComponent={
+        <View style={styles.footer}>
+          {moreError ? <InlineAlert message={moreError} testID="orders-more-error" /> : null}
+          {orders.length < total ? (
+            <AppButton testID="orders-load-more" title="Load more" variant="secondary" loading={loadingMore} onPress={() => void loadMore()} />
+          ) : null}
+        </View>
+      }
+      ListEmptyComponent={
+        filter ? (
+          <StateView icon="orders" title={EMPTY_TITLES[filter]} testID="orders-empty" />
+        ) : (
           <StateView
             icon="orders"
-            title="No orders yet"
+            title={EMPTY_TITLES.all}
             message="When you place an order, you can follow it here."
             actionLabel="Find something to eat"
             onAction={() => router.navigate('/home')}
+            testID="orders-empty"
           />
-        }
-      />
-    </Screen>
+        )
+      }
+    />
   );
 }
 
@@ -85,6 +150,28 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
+  filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  chip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    backgroundColor: BrandColors.surface,
+  },
+  chipSelected: {
+    borderColor: BrandColors.primary,
+    backgroundColor: BrandColors.primarySoft,
+  },
+  chipTextSelected: {
+    color: BrandColors.primaryText,
+  },
   list: {
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
@@ -97,5 +184,9 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: Spacing.three,
+  },
+  footer: {
+    gap: Spacing.two,
+    paddingTop: Spacing.three,
   },
 });

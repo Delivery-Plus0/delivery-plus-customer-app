@@ -20,3 +20,26 @@ tags:
     id: driver-card
 - assertNotVisible:
     id: order-cancel
+# #143: the reason and payment line come from what the backend recorded for this order.
+- assertVisible:
+    id: order-outcome
+    text: 'Your payment was declined, so the order was not placed\.'
+- assertVisible:
+    id: order-payment-status
+    text: 'Payment declined · you were not charged'
+# The Orders tab lists it under "Cancelled & failed", not under "Completed".
+- openLink: ${APP_URL}/orders
+- extendedWaitUntil:
+    visible:
+      id: orders-filter-cancelled
+    timeout: 15000
+- tapOn:
+    id: orders-filter-cancelled
+- extendedWaitUntil:
+    visible:
+      id: order-card-${FAILED_ORDER_ID}
+    timeout: 15000
+- tapOn:
+    id: orders-filter-completed
+- assertNotVisible:
+    id: order-card-${FAILED_ORDER_ID}
