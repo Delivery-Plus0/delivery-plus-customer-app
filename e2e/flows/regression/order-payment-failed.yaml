@@ -20,10 +20,11 @@ tags:
     id: driver-card
 - assertNotVisible:
     id: order-cancel
-# #143: the reason and payment line come from what the backend recorded for this order.
+# #143: the reason and payment line come from what the backend recorded for this order. The alert
+# element also holds its icon, so its id and its sentence are checked separately.
 - assertVisible:
     id: order-outcome
-    text: 'Your payment was declined, so the order was not placed\.'
+- assertVisible: 'Your payment was declined, so the order was not placed\.'
 - assertVisible:
     id: order-payment-status
     text: 'Payment declined · you were not charged'
