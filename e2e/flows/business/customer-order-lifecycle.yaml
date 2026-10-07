@@ -314,6 +314,33 @@ tags:
 - assertNotVisible:
     id: driver-marker
 
+# RATING (#144): after delivery the customer rates the driver once; the screen then shows the stored rating.
+- extendedWaitUntil:
+    visible:
+      id: rating-card
+    timeout: 20000
+- assertVisible: 'How was your delivery with .*\?'
+- tapOn:
+    id: rating-star-5
+- assertVisible:
+    id: rating-score-label
+    text: '5 stars · Excellent'
+- tapOn:
+    id: rating-comment
+- inputText: Quick and careful
+- tapOn:
+    id: rating-submit
+- extendedWaitUntil:
+    visible:
+      id: rating-done
+    timeout: 15000
+- assertVisible:
+    id: rating-done-stars
+    text: '★★★★★'
+- assertVisible: '.*Quick and careful.*'
+- assertNotVisible:
+    id: rating-card
+
 # Server-side checks for this order: DELIVERED, exactly one delivery row, no new dead letters.
 - runScript:
     file: ../../scripts/control.js
