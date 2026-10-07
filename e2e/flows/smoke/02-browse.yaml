@@ -21,8 +21,8 @@ tags:
     timeout: 15000
 - assertVisible: Mains
 - assertVisible: QA Pasta
-- assertVisible: '\$10\.00'
-- assertVisible: '\$12\.50'
+- assertVisible: 'EGP.10\.00'
+- assertVisible: 'EGP.12\.50'
 - assertVisible:
     id: add-QA Burger
 # Lower sections are below the fold of the test viewport: scroll before asserting, so a

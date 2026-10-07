@@ -30,7 +30,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: cart-subtotal
-      text: '\$7\.00'
+      text: 'EGP.7\.00'
     timeout: 15000
 - tapOn:
     id: cart-checkout
@@ -38,7 +38,7 @@ tags:
     visible:
       id: checkout-place-order
     timeout: 15000
-- assertVisible: 'Place order · \$7\.00'
+- assertVisible: 'Place order · EGP.7\.00'
 - tapOn:
     id: checkout-place-order
 # Real order + payment through the gateway; the app routes to the order it created.
