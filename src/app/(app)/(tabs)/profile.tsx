@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 
+import { PhoneVerificationSheet } from '@/components/phone-verification-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { FormTextInput } from '@/components/ui/form-text-input';
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -24,6 +26,7 @@ export default function ProfileScreen() {
   const { session } = useAuthSession();
   const [editing, setEditing] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
+  const [verifySheet, setVerifySheet] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const signOut = async () => {
@@ -123,7 +126,28 @@ export default function ProfileScreen() {
             <Card>
               <DetailRow icon="person" label="Full name" value={profile.data.fullName} />
               <DetailRow icon="mail" label="Email" value={profile.data.email} />
-              <DetailRow icon="phone" label="Phone" value={formatPhone(profile.data.phone)} placeholder="Add a phone number" />
+              <DetailRow
+                icon="phone"
+                label="Phone"
+                value={formatPhone(profile.data.phone)}
+                placeholder="Add a phone number"
+                trailing={
+                  profile.data.phone ? (
+                    profile.data.phoneVerifiedAt ? (
+                      <Badge label="Verified" tone="success" testID="profile-phone-status" />
+                    ) : (
+                      <AppButton
+                        testID="profile-verify-phone"
+                        title="Verify"
+                        variant="secondary"
+                        size="sm"
+                        fullWidth={false}
+                        onPress={() => setVerifySheet(true)}
+                      />
+                    )
+                  ) : null
+                }
+              />
               <DetailRow
                 icon="location"
                 label="Delivery address"
@@ -144,6 +168,16 @@ export default function ProfileScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {verifySheet && profile.data?.phone ? (
+        <PhoneVerificationSheet
+          phone={profile.data.phone}
+          onClose={() => setVerifySheet(false)}
+          onVerified={() => {
+            setVerifySheet(false);
+            setNotice('Phone verified.');
+          }}
+        />
+      ) : null}
       {photoSheet && profile.data ? (
         <PhotoSheet
           profile={profile.data}
@@ -226,12 +260,15 @@ function DetailRow({
   value,
   placeholder,
   last = false,
+  trailing,
 }: {
   icon: IconName;
   label: string;
   value?: string | null;
   placeholder?: string;
   last?: boolean;
+  /** Shown at the end of the row, e.g. the phone's verification (#153). */
+  trailing?: ReactNode;
 }) {
   return (
     <View style={[styles.detailRow, !last && styles.detailDivider]}>
@@ -244,6 +281,7 @@ function DetailRow({
           {value || placeholder || '—'}
         </ThemedText>
       </View>
+      {trailing}
     </View>
   );
 }

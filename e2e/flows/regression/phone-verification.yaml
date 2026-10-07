@@ -1,0 +1,67 @@
+url: ${APP_URL}
+name: Phone verification - the profile phone is verified with a texted code; a wrong code is refused
+tags:
+  - regression
+---
+# Fixture: the QA customer's phone (+20 100 000 0001) is unverified and no code has been sent.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: profile/reset-phone-verification
+- runFlow: ../_shared/login.yaml
+- openLink: ${APP_URL}/profile
+- extendedWaitUntil:
+    visible:
+      id: profile-verify-phone
+    timeout: 20000
+
+# Send the code (the test stack keeps it instead of texting it).
+- tapOn:
+    id: profile-verify-phone
+- extendedWaitUntil:
+    visible:
+      id: verify-sheet
+    timeout: 10000
+- tapOn:
+    id: verify-send
+- extendedWaitUntil:
+    visible:
+      id: verify-sent
+    timeout: 15000
+- assertVisible: 'Enter the code we sent to \+20 100 000 0001\..*'
+# Resending waits for the cooldown.
+- assertVisible:
+    id: verify-resend
+    text: 'Resend code in [0-9]+ s'
+
+# A wrong code is refused with the backend's message.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: profile/read-sms-code
+- tapOn:
+    id: verify-code
+- inputText: ${output.control.wrongCode}
+- tapOn:
+    id: verify-submit
+- extendedWaitUntil:
+    visible:
+      id: verify-error
+    timeout: 15000
+- assertVisible: '.*That code isn.t right\. 4 tries left\..*'
+
+# The right code verifies the phone.
+- tapOn:
+    id: verify-code
+- eraseText: 10
+- inputText: ${output.control.code}
+- tapOn:
+    id: verify-submit
+- extendedWaitUntil:
+    visible:
+      id: profile-notice
+    timeout: 15000
+- assertVisible: 'Phone verified\.'
+- assertVisible:
+    id: profile-phone-status
+    text: Verified

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { PhoneVerificationSheet } from '@/components/phone-verification-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
@@ -16,6 +17,8 @@ import { reloadCart, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
 import { invalidateResources } from '@/state/resource-cache';
 import { useOrderQuote } from '@/state/orders';
+import { useProfile } from '@/state/profile';
+import { isPhoneNotVerified } from '@/utils/phone-verification';
 import { formatMoney } from '@/utils/format';
 
 function createIdempotencyKey(prefix: string): string {
@@ -31,6 +34,10 @@ export default function CheckoutScreen() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [failedOrderId, setFailedOrderId] = useState<string | null>(null);
+  // #153: ordering can require a verified phone; the next step is offered right here.
+  const [needsVerifiedPhone, setNeedsVerifiedPhone] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const profile = useProfile();
   // Stable for this checkout attempt so a retry can never create a duplicate order or charge.
   const orderIdempotencyKey = useRef(createIdempotencyKey('order'));
   const paymentIdempotencyKey = useRef(createIdempotencyKey('payment'));
@@ -40,6 +47,7 @@ export default function CheckoutScreen() {
       setPlacingOrder(true);
       setErrorMessage(null);
       setFailedOrderId(null);
+      setNeedsVerifiedPhone(false);
       const { order, payment } = await submitCheckout(orderIdempotencyKey.current, paymentIdempotencyKey.current);
 
       // The order-service empties the cart once the order exists, whatever happens to payment.
@@ -60,6 +68,7 @@ export default function CheckoutScreen() {
 
       router.replace({ pathname: '/order/[id]', params: { id: order.id, placed: '1' } });
     } catch (error) {
+      setNeedsVerifiedPhone(isPhoneNotVerified(error));
       setErrorMessage(error instanceof Error ? error.message : 'We could not place your order. Please try again.');
     } finally {
       setPlacingOrder(false);
@@ -126,6 +135,13 @@ export default function CheckoutScreen() {
       {header}
       <ScrollView contentContainerStyle={styles.content}>
         {errorMessage ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
+        {needsVerifiedPhone ? (
+          profile.data?.phone ? (
+            <AppButton testID="checkout-verify-phone" title="Verify your phone" icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
+          ) : (
+            <AppButton testID="checkout-add-phone" title="Add your phone number" icon="phone" variant="secondary" onPress={() => router.navigate('/profile')} />
+          )
+        ) : null}
 
         {restaurant.data ? (
           <Card style={styles.row}>
@@ -207,6 +223,17 @@ export default function CheckoutScreen() {
           </View>
         </Card>
       </ScrollView>
+      {verifying && profile.data?.phone ? (
+        <PhoneVerificationSheet
+          phone={profile.data.phone}
+          onClose={() => setVerifying(false)}
+          onVerified={() => {
+            setVerifying(false);
+            setNeedsVerifiedPhone(false);
+            setErrorMessage(null);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

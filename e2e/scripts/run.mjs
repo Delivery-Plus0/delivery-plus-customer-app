@@ -64,6 +64,7 @@ const SUITES = {
   regression: [
     'regression/order-awaiting-driver.yaml',
     'regression/profile-photo.yaml',
+    'regression/phone-verification.yaml',
     'regression/order-payment-failed.yaml',
     'regression/unauthorized-order.yaml',
     'regression/offline-recovery.yaml',
@@ -236,6 +237,25 @@ const actions = {
     if (!profile.avatarUrl) throw new Error('Avatar not attached');
   },
   // Fixture: the QA customer starts without a photo.
+  // Fixture (#153): the QA customer's phone starts unverified, with no codes sent (so the hourly send
+  // limit never trips on repeated runs). Test stack only: straight to user-service's tables.
+  'profile/reset-phone-verification': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    const me = await api('GET', '/api/users/me', customer);
+    const sql = `delete from phone_verifications where "userId" = '${me.id}'; update user_profiles set "phoneVerifiedAt" = null where id = '${me.id}'`;
+    docker('exec', container('postgres'), 'psql', '-U', 'postgres', '-d', 'user_service', '-c', sql);
+    docker('exec', container('redis'), 'redis-cli', 'DEL', `test:sms:${me.phone}`);
+  },
+  // The code the test SMS sender (SMS_PROVIDER=test) kept for the QA customer's phone; never sent anywhere.
+  'profile/read-sms-code': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    const me = await api('GET', '/api/users/me', customer);
+    const text = docker('exec', container('redis'), 'redis-cli', 'GET', `test:sms:${me.phone}`).trim();
+    const code = /(\d{6})/.exec(text)?.[1];
+    if (!code) throw new Error(`No verification code was sent to ${me.phone}`);
+    state.code = code;
+    state.wrongCode = code === '000000' ? '111111' : '000000';
+  },
   'profile/clear-avatar': async () => {
     const customer = await login(manifest.accounts.customer.email);
     await api('DELETE', '/api/users/me/avatar', customer);

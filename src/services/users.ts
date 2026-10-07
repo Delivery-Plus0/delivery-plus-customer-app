@@ -9,6 +9,8 @@ export type UserProfile = {
   phone?: string | null;
   address?: string | null;
   avatarUrl?: string | null;
+  /** Set once the phone was confirmed by a texted code (#153); cleared when the phone changes. */
+  phoneVerifiedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -39,4 +41,16 @@ export async function confirmAvatarUpload(objectKey: string): Promise<UserProfil
 
 export async function removeMyAvatar(): Promise<UserProfile> {
   return apiDelete<UserProfile>('/api/users/me/avatar', true);
+}
+
+/** POST /users/me/phone/verification (#153): texts a code to the profile phone. */
+export type PhoneVerificationStarted = { phone: string; expiresAt: string; resendAvailableAt: string };
+
+export async function startPhoneVerification(): Promise<PhoneVerificationStarted> {
+  return apiPost<PhoneVerificationStarted>('/api/users/me/phone/verification', {}, true);
+}
+
+/** POST /users/me/phone/verify: the right code marks the phone verified and returns the profile. */
+export async function verifyPhone(code: string): Promise<UserProfile> {
+  return apiPost<UserProfile>('/api/users/me/phone/verify', { code }, true);
 }
