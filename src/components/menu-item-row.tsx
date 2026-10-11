@@ -8,6 +8,7 @@ import { QuantityStepper } from '@/components/ui/quantity-stepper';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { MenuItem } from '@/services/menus';
 import { formatMoney } from '@/utils/format';
+import { t } from '@/i18n';
 
 type MenuItemRowProps = {
   item: MenuItem;
@@ -67,7 +68,7 @@ export const MenuItemRow = memo(function MenuItemRow({
           <Pressable
             testID={`add-${item.name}`} nativeID={`add-${item.name}`}
             accessibilityRole="button"
-            accessibilityLabel={`Add ${item.name} to cart`}
+            accessibilityLabel={t('Add {name} to cart', { name: item.name })}
             accessibilityState={{ busy: pending, disabled: pending }}
             disabled={pending}
             onPress={() => onAdd(item)}

@@ -4,6 +4,7 @@ import type { ColorValue } from 'react-native';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { BrandColors } from '@/constants/theme';
 import { unreadCount, useNotifications } from '@/state/notifications';
+import { t } from '@/i18n';
 
 const NOTIFICATION_POLL_MS = 60_000;
 
@@ -28,19 +29,19 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: BrandColors.background },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: tabIcon('home'), tabBarButtonTestID: 'tab-home' }} />
-      <Tabs.Screen name="orders" options={{ title: 'Orders', tabBarIcon: tabIcon('orders'), tabBarButtonTestID: 'tab-orders' }} />
+      <Tabs.Screen name="home" options={{ title: t('Home'), tabBarIcon: tabIcon('home'), tabBarButtonTestID: 'tab-home' }} />
+      <Tabs.Screen name="orders" options={{ title: t('Orders'), tabBarIcon: tabIcon('orders'), tabBarButtonTestID: 'tab-orders' }} />
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Alerts',
+          title: t('Alerts'),
           tabBarIcon: tabIcon('bell'),
           tabBarButtonTestID: 'tab-alerts',
           tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: BrandColors.primary, color: BrandColors.onPrimary },
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tabIcon('person'), tabBarButtonTestID: 'tab-profile' }} />
+      <Tabs.Screen name="profile" options={{ title: t('Profile'), tabBarIcon: tabIcon('person'), tabBarButtonTestID: 'tab-profile' }} />
     </Tabs>
   );
 }

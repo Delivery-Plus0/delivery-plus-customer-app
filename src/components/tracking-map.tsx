@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon';
 import { MAP_ATTRIBUTION, MAP_TILE_URL } from '@/config/map';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { isValidPosition, tilesForViewport, TILE_SIZE, type LatLng } from '@/utils/map-tiles';
+import { t } from '@/i18n';
 
 /** Street level: a few blocks around the driver. */
 const ZOOM = 15;
@@ -56,7 +57,7 @@ export function TrackingMap({ position, freshness }: TrackingMapProps) {
       {stale ? <View style={styles.staleVeil} /> : null}
       {tilesUnavailable ? (
         <ThemedText type="caption" themeColor="textSecondary" style={styles.unavailable}>
-          Map unavailable
+          {t('Map unavailable')}
         </ThemedText>
       ) : null}
 
@@ -66,7 +67,7 @@ export function TrackingMap({ position, freshness }: TrackingMapProps) {
           style={[styles.pinLabel, stale ? styles.pinLabelStale : styles.pinLabelLive]}>
           <Icon name="location" size={IconSize.sm} color={BrandColors.onPrimary} />
           <ThemedText type="caption" style={styles.pinText}>
-            Driver
+            {t('Driver')}
           </ThemedText>
         </View>
         <View style={[styles.pinDot, stale ? styles.pinDotStale : styles.pinDotLive]} />
@@ -87,6 +88,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: BrandColors.surfaceMuted,
+    // Tiles are placed by pixel offset: a map stays geographic (west on the left) in Arabic too (#151).
+    direction: 'ltr',
   },
   tile: {
     position: 'absolute',

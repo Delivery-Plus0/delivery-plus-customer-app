@@ -7,12 +7,33 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Icon } from '@/components/ui/icon';
 import { BrandColors, Elevation, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { Restaurant, RestaurantStatus } from '@/services/restaurants';
+import { t } from '@/i18n';
 
 export const restaurantStatusMeta: Record<RestaurantStatus, { label: string; tone: BadgeTone }> = {
-  OPEN: { label: 'Open', tone: 'success' },
-  BUSY: { label: 'Busy', tone: 'warning' },
-  CLOSED: { label: 'Closed', tone: 'neutral' },
-  SUSPENDED: { label: 'Unavailable', tone: 'danger' },
+  OPEN: {
+    get label() {
+      return t('Open');
+    },
+    tone: 'success',
+  },
+  BUSY: {
+    get label() {
+      return t('Busy');
+    },
+    tone: 'warning',
+  },
+  CLOSED: {
+    get label() {
+      return t('Closed');
+    },
+    tone: 'neutral',
+  },
+  SUSPENDED: {
+    get label() {
+      return t('Unavailable');
+    },
+    tone: 'danger',
+  },
 };
 
 type RestaurantCardProps = {

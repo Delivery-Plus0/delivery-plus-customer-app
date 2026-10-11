@@ -67,6 +67,7 @@ const SUITES = {
     'regression/phone-verification.yaml',
     'regression/order-payment-failed.yaml',
     'regression/order-cancel.yaml',
+    'regression/arabic.yaml',
     'regression/unauthorized-order.yaml',
     'regression/offline-recovery.yaml',
   ],
@@ -270,6 +271,8 @@ const actions = {
     if (!newest) throw new Error('The QA customer has no orders');
     await waitForOrderStatus(newest.id, customer, 'CONFIRMED');
     state.orderId = newest.id;
+    // Alerts show the short id (#151 message keys): the first 8 characters, upper-case.
+    state.shortOrderId = newest.id.slice(0, 8).toUpperCase();
   },
   // No restaurant, dispatch or driver stand-ins in the business flow: the kitchen steps run in the
   // restaurant app, delivery-service dispatches on order.ready_for_pickup by itself, and the driver
@@ -373,7 +376,7 @@ function buildWeb(appDir = APP_DIR, outDir = WEB_BUILD, extraEnv = {}) {
     cwd: appDir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, CI: '1', EXPO_PUBLIC_API_BASE_URL: API_URL, ...extraEnv },
+    env: { ...process.env, CI: '1', EXPO_PUBLIC_API_BASE_URL: API_URL, EXPO_PUBLIC_DEFAULT_LOCALE: process.env.E2E_LOCALE ?? 'en', ...extraEnv },
   });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }

@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { BrandColors, Radius, Spacing } from '@/constants/theme';
 import type { DriverCard as DriverCardData } from '@/services/deliveries';
+import { t } from '@/i18n';
 
 /**
  * Who is delivering (#140): photo (or initial), first name, vehicle and plate, exactly as the backend
@@ -14,7 +15,7 @@ export function DriverCard({ driver }: { driver: DriverCardData }) {
   const vehicle = [driver.vehicleType, driver.licensePlate].filter(Boolean).join(' · ');
   return (
     <Card testID="driver-card">
-      <View style={styles.row} accessible accessibilityLabel={`Your driver: ${driver.displayName}${vehicle ? `, ${vehicle}` : ''}`}>
+      <View style={styles.row} accessible accessibilityLabel={t('Your driver: {name}', { name: vehicle ? `${driver.displayName}, ${vehicle}` : driver.displayName })}>
         <View style={styles.avatar}>
           {driver.avatarUrl ? (
             <Image source={driver.avatarUrl} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
@@ -26,7 +27,7 @@ export function DriverCard({ driver }: { driver: DriverCardData }) {
         </View>
         <View style={styles.flex}>
           <ThemedText type="caption" themeColor="textSecondary">
-            YOUR DRIVER
+            {t('YOUR DRIVER')}
           </ThemedText>
           <ThemedText type="defaultBold" testID="driver-card-name">
             {driver.displayName}

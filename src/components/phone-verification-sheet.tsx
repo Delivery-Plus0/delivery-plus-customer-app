@@ -11,6 +11,7 @@ import type { PhoneVerificationStarted, UserProfile } from '@/services/users';
 import { confirmPhoneCode, sendPhoneCode } from '@/state/profile';
 import { formatPhone } from '@/utils/phone';
 import { cleanCode, isCompleteCode, secondsUntil } from '@/utils/phone-verification';
+import { t } from '@/i18n';
 
 type PhoneVerificationSheetProps = {
   /** The profile phone (E.164) the code goes to. */
@@ -46,7 +47,7 @@ export function PhoneVerificationSheet({ phone, onClose, onVerified }: PhoneVeri
     try {
       await action();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'That did not go through. Try again.');
+      setError(caught instanceof Error ? t(caught.message) : t('That did not go through. Try again.'));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -62,30 +63,30 @@ export function PhoneVerificationSheet({ phone, onClose, onVerified }: PhoneVeri
 
   const verify = () =>
     run(async () => {
-      if (!isCompleteCode(code)) throw new Error('Enter the 6 digits from the text message.');
+      if (!isCompleteCode(code)) throw new Error(t('Enter the 6 digits from the text message.'));
       onVerified(await confirmPhoneCode(cleanCode(code)));
     });
 
   const resendIn = secondsUntil(sent?.resendAvailableAt, now);
 
   return (
-    <Sheet visible title="Verify your phone" onClose={onClose} testID="verify-sheet">
+    <Sheet visible title={t('Verify your phone')} onClose={onClose} testID="verify-sheet">
       {!sent ? (
         <View style={styles.body}>
           <ThemedText type="default">
-            We&apos;ll text a 6-digit code to <ThemedText type="defaultBold">{formatPhone(phone)}</ThemedText>.
+            {t("We'll text a 6-digit code to {phone}.", { phone: formatPhone(phone) })}
           </ThemedText>
           {error ? <InlineAlert message={error} testID="verify-error" /> : null}
-          <AppButton testID="verify-send" title="Send code" loading={busy} onPress={() => void send()} />
+          <AppButton testID="verify-send" title={t('Send code')} loading={busy} onPress={() => void send()} />
         </View>
       ) : (
         <View style={styles.body}>
           <ThemedText type="default" testID="verify-sent" nativeID="verify-sent">
-            Enter the code we sent to {formatPhone(sent.phone)}. It expires in 5 minutes.
+            {t('Enter the code we sent to {phone}. It expires in 5 minutes.', { phone: formatPhone(sent.phone) })}
           </ThemedText>
           <FormTextInput
             testID="verify-code"
-            label="Code"
+            label={t('Code')}
             value={code}
             onChangeText={setCode}
             keyboardType="number-pad"
@@ -94,10 +95,10 @@ export function PhoneVerificationSheet({ phone, onClose, onVerified }: PhoneVeri
             maxLength={8}
           />
           {error ? <InlineAlert message={error} testID="verify-error" /> : null}
-          <AppButton testID="verify-submit" title="Verify" loading={busy} onPress={() => void verify()} />
+          <AppButton testID="verify-submit" title={t('Verify')} loading={busy} onPress={() => void verify()} />
           <AppButton
             testID="verify-resend"
-            title={resendIn > 0 ? `Resend code in ${resendIn} s` : 'Resend code'}
+            title={resendIn > 0 ? t('Resend code in {seconds} s', { seconds: resendIn }) : t('Resend code')}
             variant="ghost"
             disabled={busy || resendIn > 0}
             onPress={() => void send()}

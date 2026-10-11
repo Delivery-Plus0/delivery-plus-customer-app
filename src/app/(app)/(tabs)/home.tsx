@@ -18,10 +18,13 @@ import { cartItemCount, useCart } from '@/state/cart';
 import { useRestaurants } from '@/state/catalog';
 import { useProfile } from '@/state/profile';
 import { firstName, greetingFor } from '@/utils/format';
+import { t } from '@/i18n';
 
-type Filter = { label: string; status?: RestaurantStatus };
+type Filter = { id: string; status?: RestaurantStatus };
 
-const FILTERS: Filter[] = [{ label: 'All' }, { label: 'Open now', status: 'OPEN' }];
+// `id` stays English (test ids); the label is translated when shown (#151).
+const FILTERS: Filter[] = [{ id: 'All' }, { id: 'Open now', status: 'OPEN' }];
+const filterLabel = (filter: Filter) => (filter.status ? t('Open now') : t('All'));
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
@@ -58,13 +61,13 @@ export default function HomeScreen() {
             {name ? `, ${name}` : ''}
           </ThemedText>
           <ThemedText type="subtitle" accessibilityRole="header" testID="home-title">
-            What are you craving?
+            {t('What are you craving?')}
           </ThemedText>
         </View>
         <IconButton
           testID="home-cart"
           icon="bag"
-          accessibilityLabel="Cart"
+          accessibilityLabel={t('Cart')}
           badgeCount={cartItemCount(cart)}
           onPress={() => router.push('/cart')}
         />
@@ -78,34 +81,34 @@ export default function HomeScreen() {
             nativeID="home-search"
             value={search}
             onChangeText={setSearch}
-            placeholder="Search restaurants"
+            placeholder={t('Search restaurants')}
             placeholderTextColor={BrandColors.textMuted}
-            accessibilityLabel="Search restaurants"
+            accessibilityLabel={t('Search restaurants')}
             returnKeyType="search"
             autoCorrect={false}
             style={styles.searchInput}
           />
           {search ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8} onPress={() => setSearch('')}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('Clear search')} hitSlop={8} onPress={() => setSearch('')}>
               <Icon name="close" size={IconSize.sm} color={BrandColors.textSecondary} />
             </Pressable>
           ) : null}
         </View>
         <View style={styles.filters}>
           {FILTERS.map((option) => {
-            const selected = option.label === filter.label;
+            const selected = option.id === filter.id;
             return (
               <Pressable
-                testID={`filter-${option.label}`}
-                nativeID={`filter-${option.label}`}
-                key={option.label}
+                testID={`filter-${option.id}`}
+                nativeID={`filter-${option.id}`}
+                key={option.id}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 onPress={() => setFilter(option)}
                 style={[styles.chip, selected && styles.chipSelected]}
               >
                 <ThemedText type="smallBold" style={selected ? styles.chipTextSelected : styles.chipText}>
-                  {option.label}
+                  {filterLabel(option)}
                 </ThemedText>
               </Pressable>
             );
@@ -136,11 +139,11 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <StateView
               icon={isSearching ? 'search' : 'store'}
-              title={isSearching ? 'No matches' : 'No restaurants yet'}
+              title={isSearching ? t('No matches') : t('No restaurants yet')}
               message={
                 isSearching
-                  ? 'Try a different name or clear the filters.'
-                  : 'Restaurants will show up here as soon as they join Delivery Plus.'
+                  ? t('Try a different name or clear the filters.')
+                  : t('Restaurants will show up here as soon as they join Delivery Plus.')
               }
             />
           }

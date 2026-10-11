@@ -1,32 +1,75 @@
 import type { Order, OrderFilter } from '@/services/orders';
+import { t } from '@/i18n/core';
 
+// Getters, so the labels follow the current language (#151).
 export const ORDER_FILTER_OPTIONS: { key: OrderFilter | null; label: string; testID: string }[] = [
-  { key: null, label: 'All', testID: 'orders-filter-all' },
-  { key: 'active', label: 'Active', testID: 'orders-filter-active' },
-  { key: 'completed', label: 'Completed', testID: 'orders-filter-completed' },
-  { key: 'cancelled', label: 'Cancelled & failed', testID: 'orders-filter-cancelled' },
+  {
+    key: null,
+    get label() {
+      return t('All');
+    },
+    testID: 'orders-filter-all',
+  },
+  {
+    key: 'active',
+    get label() {
+      return t('Active');
+    },
+    testID: 'orders-filter-active',
+  },
+  {
+    key: 'completed',
+    get label() {
+      return t('Completed');
+    },
+    testID: 'orders-filter-completed',
+  },
+  {
+    key: 'cancelled',
+    get label() {
+      return t('Cancelled & failed');
+    },
+    testID: 'orders-filter-cancelled',
+  },
 ];
 
 /**
- * Why an unsuccessful order ended, exactly as the backend recorded it (#143); null for orders that
- * didn't end that way, or that ended before reasons were recorded. Never made up by the app.
+ * Why an unsuccessful order ended, from what the backend recorded (#143): who ended it and, for a
+ * restaurant or the platform, their own words (`cancellationNote`, #151), in the current language. Older
+ * orders without a note keep the backend's English sentence. Null for orders that didn't end that way.
+ * Never made up by the app.
  */
-export function outcomeReason(order: Pick<Order, 'status' | 'cancellationReason'>): string | null {
+export function outcomeReason(order: Pick<Order, 'status' | 'cancellationReason' | 'cancelledBy' | 'cancellationNote'>): string | null {
   if (order.status !== 'CANCELLED' && order.status !== 'FAILED') return null;
-  return order.cancellationReason?.trim() || null;
+  const recorded = order.cancellationReason?.trim() || null;
+  const note = order.cancellationNote?.trim();
+  switch (order.cancelledBy) {
+    case 'PAYMENT':
+      return t('Your payment was declined, so the order was not placed.');
+    case 'CUSTOMER':
+      return t('You cancelled this order.');
+    case 'RESTAURANT':
+      if (note) return t('The restaurant cancelled this order: {note}', { note });
+      return recorded && recorded !== 'The restaurant cancelled this order.' ? recorded : t('The restaurant cancelled this order.');
+    case 'SYSTEM':
+      if (note) return t('Delivery Plus cancelled this order: {note}', { note });
+      return recorded && recorded !== 'Delivery Plus cancelled this order.' ? recorded : t('Delivery Plus cancelled this order.');
+    default:
+      return recorded;
+  }
 }
 
 /** The payment line of the summary, from the backend's payment status for this order. */
 export function paymentStatusLabel(order: Pick<Order, 'status' | 'paymentStatus'>): string {
   switch (order.paymentStatus) {
     case 'COMPLETED':
-      return 'Paid';
+      return t('Paid');
     case 'PENDING':
-      return 'Payment pending';
+      return t('Payment pending');
     case 'FAILED':
-      return 'Payment declined · you were not charged';
+      return t('Payment declined · you were not charged');
     default:
-      return order.status === 'CREATED' ? 'Not paid yet' : 'Not recorded';
+      return order.status === 'CREATED' ? t('Not paid yet') : t('Not recorded');
   }
 }
 

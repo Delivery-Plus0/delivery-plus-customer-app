@@ -10,6 +10,7 @@ import { BrandColors, Spacing } from '@/constants/theme';
 import { ApiError } from '@/services/api';
 import { rateDelivery, useDeliveryRating } from '@/state/ratings';
 import { RATING_COMMENT_MAX, RATING_SCORES, commentError, ratingPrompt, scoreLabel, starsText } from '@/utils/rating';
+import { t } from '@/i18n';
 
 type Props = { deliveryId: string; driverName: string | null | undefined };
 
@@ -32,7 +33,7 @@ export function RateDriverCard({ deliveryId, driverName }: Props) {
     const { rating } = data;
     return (
       <Card testID="rating-done">
-        <ThemedText type="smallBold">Your rating</ThemedText>
+        <ThemedText type="smallBold">{t('Your rating')}</ThemedText>
         <ThemedText type="subtitle" style={styles.stars} accessibilityLabel={scoreLabel(rating.score)} testID="rating-done-stars">
           {starsText(rating.score)}
         </ThemedText>
@@ -55,7 +56,7 @@ export function RateDriverCard({ deliveryId, driverName }: Props) {
 
   if (later) {
     return (
-      <AppButton testID="rating-open" title="Rate your driver" variant="secondary" onPress={() => setLater(false)} />
+      <AppButton testID="rating-open" title={t('Rate your driver')} variant="secondary" onPress={() => setLater(false)} />
     );
   }
 
@@ -68,7 +69,7 @@ export function RateDriverCard({ deliveryId, driverName }: Props) {
     try {
       await rateDelivery(deliveryId, score, comment);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not send your rating. Please try again.');
+      setError(caught instanceof ApiError ? caught.message : t('Could not send your rating. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -104,24 +105,24 @@ export function RateDriverCard({ deliveryId, driverName }: Props) {
       ) : null}
       <FormTextInput
         testID="rating-comment"
-        label="Comment (optional)"
+        label={t('Comment (optional)')}
         value={comment}
         onChangeText={setComment}
         maxLength={RATING_COMMENT_MAX + 50}
         multiline
         error={tooLong}
-        placeholder="Anything the driver did well, or could do better"
+        placeholder={t('Anything the driver did well, or could do better')}
       />
       {error ? <InlineAlert message={error} testID="rating-error" /> : null}
       <View style={styles.actions}>
         <AppButton
           testID="rating-submit"
-          title="Send rating"
+          title={t('Send rating')}
           onPress={() => void submit()}
           disabled={score === null || !!tooLong}
           loading={submitting}
         />
-        <AppButton testID="rating-later" title="Later" variant="ghost" onPress={() => setLater(true)} />
+        <AppButton testID="rating-later" title={t('Later')} variant="ghost" onPress={() => setLater(true)} />
       </View>
     </Card>
   );

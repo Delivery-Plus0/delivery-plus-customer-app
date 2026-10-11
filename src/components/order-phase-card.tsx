@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
-import { ORDER_PHASE_STEPS, type OrderPhase, type OrderPhaseKey } from '@/utils/order-phase';
+import { ORDER_PHASE_STEPS, phaseStepLabel, type OrderPhase, type OrderPhaseKey } from '@/utils/order-phase';
 
 const ICONS: Record<OrderPhaseKey, IconName> = {
   placed: 'orders',
@@ -70,7 +70,7 @@ export function OrderPhaseCard({ phase, note }: OrderPhaseCardProps) {
               <View key={label} style={styles.step}>
                 <View style={[styles.bar, done && styles.barDone, current && styles.barCurrent]} />
                 <ThemedText type="caption" themeColor={done || current ? 'text' : 'textSecondary'} numberOfLines={1}>
-                  {label}
+                  {phaseStepLabel(label)}
                 </ThemedText>
               </View>
             );

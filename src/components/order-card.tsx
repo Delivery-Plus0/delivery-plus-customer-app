@@ -9,12 +9,13 @@ import { Spacing } from '@/constants/theme';
 import type { Order } from '@/services/orders';
 import { useRestaurant } from '@/state/catalog';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
+import { t } from '@/i18n';
 
 function summarizeItems(order: Order): string {
   const [first, ...rest] = order.items;
-  if (!first) return 'No items';
+  if (!first) return t('No items');
   const lead = `${first.quantity}× ${first.name}`;
-  return rest.length ? `${lead} +${rest.length} more` : lead;
+  return rest.length ? t('{first} +{count} more', { first: lead, count: rest.length }) : lead;
 }
 
 export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
@@ -25,7 +26,7 @@ export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
     <Card
       testID={`order-card-${order.id}`}
       onPress={() => router.push({ pathname: '/order/[id]', params: { id: order.id } })}
-      accessibilityLabel={`Order from ${restaurantName}, ${formatMoney(order.totalAmount)}`}
+      accessibilityLabel={t('Order from {name}, {total}', { name: restaurantName, total: formatMoney(order.totalAmount) })}
     >
       <View style={styles.topRow}>
         <View style={styles.flex}>

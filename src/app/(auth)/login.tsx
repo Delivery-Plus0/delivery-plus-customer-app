@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { loginAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
 import { describeLoginError } from '@/utils/login-errors';
+import { t } from '@/i18n';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -27,7 +28,7 @@ export default function LoginScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const emailError = !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined;
-  const passwordError = !password ? 'Password is required' : undefined;
+  const passwordError = !password ? t('Password is required') : undefined;
   const show = (field: keyof typeof touched) => submitted || touched[field];
 
   async function handleSubmit() {
@@ -62,16 +63,16 @@ export default function LoginScreen() {
 
   return (
     <AuthFormShell
-      title="Welcome back"
-      subtitle="Sign in to continue your order."
+      title={t('Welcome back')}
+      subtitle={t('Sign in to continue your order.')}
       footer={
         <>
           <ThemedText type="small" themeColor="textSecondary">
-            New to Delivery Plus?
+            {t('New to Delivery Plus?')}
           </ThemedText>
           <Link href="/register" replace asChild>
             <Pressable accessibilityRole="link" hitSlop={8}>
-              <ThemedText type="linkPrimary">Create an account</ThemedText>
+              <ThemedText type="linkPrimary">{t('Create an account')}</ThemedText>
             </Pressable>
           </Link>
         </>
@@ -79,12 +80,12 @@ export default function LoginScreen() {
     >
       <FormTextInput
         testID="login-email"
-        label="Email"
+        label={t('Email')}
         value={email}
         onChangeText={edit(setEmail, { newAccount: true })}
         onBlur={() => setTouched((current) => ({ ...current, email: true }))}
         error={show('email') ? emailError : undefined}
-        placeholder="you@example.com"
+        placeholder={t('you@example.com')}
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="email"
@@ -97,12 +98,12 @@ export default function LoginScreen() {
       <FormTextInput
         testID="login-password"
         ref={passwordRef}
-        label="Password"
+        label={t('Password')}
         value={password}
         onChangeText={edit(setPassword)}
         onBlur={() => setTouched((current) => ({ ...current, password: true }))}
         error={show('password') ? passwordError : undefined}
-        placeholder="Your password"
+        placeholder={t('Your password')}
         secureTextEntry
         autoComplete="current-password"
         textContentType="password"
@@ -116,7 +117,7 @@ export default function LoginScreen() {
         </View>
       ) : null}
 
-      <AppButton testID="login-submit" title="Sign in" onPress={() => void handleSubmit()} loading={isSubmitting} />
+      <AppButton testID="login-submit" title={t('Sign in')} onPress={() => void handleSubmit()} loading={isSubmitting} />
 
       {__DEV__ ? (
         // Development builds only: the dev (:3000) and E2E (:3100) backends have different accounts.
