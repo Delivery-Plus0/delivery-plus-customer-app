@@ -1,6 +1,17 @@
 import { pickImage, uploadToPresigned } from '@/utils/image-upload';
 import { useResource } from '@/hooks/use-resource';
-import { fetchMyProfile, updateMyProfile, type UpdateProfileRequest, type UserProfile, confirmAvatarUpload, createAvatarUploadUrl, removeMyAvatar } from '@/services/users';
+import {
+  fetchMyProfile,
+  updateMyProfile,
+  type PhoneVerificationStarted,
+  type UpdateProfileRequest,
+  type UserProfile,
+  confirmAvatarUpload,
+  createAvatarUploadUrl,
+  removeMyAvatar,
+  startPhoneVerification,
+  verifyPhone,
+} from '@/services/users';
 import { setResourceData } from '@/state/resource-cache';
 
 export const PROFILE_KEY = 'profile';
@@ -31,6 +42,18 @@ export async function changeAvatar(source: 'library' | 'camera'): Promise<UserPr
 
 export async function removeAvatar(): Promise<UserProfile> {
   const profile = await removeMyAvatar();
+  setResourceData<UserProfile>(PROFILE_KEY, profile);
+  return profile;
+}
+
+/** Texts a verification code to the profile phone (#153). */
+export async function sendPhoneCode(): Promise<PhoneVerificationStarted> {
+  return startPhoneVerification();
+}
+
+/** Confirms the code; the verified profile is shown right away. */
+export async function confirmPhoneCode(code: string): Promise<UserProfile> {
+  const profile = await verifyPhone(code);
   setResourceData<UserProfile>(PROFILE_KEY, profile);
   return profile;
 }
