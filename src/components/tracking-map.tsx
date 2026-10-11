@@ -88,6 +88,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     overflow: 'hidden',
     backgroundColor: BrandColors.surfaceMuted,
+    // Tiles are placed by pixel offset: a map stays geographic (west on the left) in Arabic too (#151).
+    direction: 'ltr',
   },
   tile: {
     position: 'absolute',
