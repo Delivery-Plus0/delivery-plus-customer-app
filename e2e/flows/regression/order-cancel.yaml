@@ -1,0 +1,49 @@
+url: ${APP_URL}
+name: Cancel an order - the kit dialog asks first; keeping the order changes nothing, confirming cancels it
+tags:
+  - regression
+---
+# A fresh paid order the kitchen hasn't started.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: scenario/order-confirmed
+- runFlow: ../_shared/login.yaml
+- openLink: ${APP_URL}/order/${output.control.orderId}
+- extendedWaitUntil:
+    visible:
+      id: order-cancel
+    timeout: 20000
+
+# The shared Dialog (#155) asks first; "Keep order" closes it and the order stays.
+- tapOn:
+    id: order-cancel
+- extendedWaitUntil:
+    visible:
+      id: cancel-dialog
+    timeout: 10000
+- assertVisible: 'Cancel this order\?'
+- tapOn:
+    id: cancel-dialog-cancel
+- assertNotVisible:
+    id: cancel-dialog
+- assertVisible:
+    id: order-cancel
+
+# Confirming cancels it, as the backend records.
+- tapOn:
+    id: order-cancel
+- extendedWaitUntil:
+    visible:
+      id: cancel-dialog
+    timeout: 10000
+- tapOn:
+    id: cancel-dialog-confirm
+- extendedWaitUntil:
+    visible:
+      id: order-phase
+      text: Order cancelled
+    timeout: 20000
+- assertVisible: 'You cancelled this order\.'
+- assertNotVisible:
+    id: order-cancel

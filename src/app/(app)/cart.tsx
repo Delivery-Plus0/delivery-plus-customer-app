@@ -13,10 +13,11 @@ import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
 import { cartItemCount, emptyCart, setCartQuantity, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/hooks/use-confirm';
 import { formatMoney } from '@/utils/format';
 
 export default function CartScreen() {
+  const [confirmDialog, confirm] = useConfirm();
   const cart = useCart();
   const restaurant = useRestaurant(cart.data?.restaurantId ?? undefined);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function CartScreen() {
 
   const handleClear = async () => {
     const ok = await confirm({
+      testID: 'clear-cart-dialog',
       title: 'Clear cart?',
       message: 'This removes every item from your cart.',
       confirmLabel: 'Clear cart',
@@ -154,6 +156,7 @@ export default function CartScreen() {
           </ThemedText>
         }
       />
+      {confirmDialog}
     </Screen>
   );
 }

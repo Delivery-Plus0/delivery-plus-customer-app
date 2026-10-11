@@ -19,9 +19,10 @@ import { clearSession, useAuthSession } from '@/services/session';
 import type { UserProfile } from '@/services/users';
 import { saveProfile, useProfile, changeAvatar, removeAvatar } from '@/state/profile';
 import { PHONE_HINT, formatPhone, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/hooks/use-confirm';
 
 export default function ProfileScreen() {
+  const [confirmDialog, confirm] = useConfirm();
   const profile = useProfile();
   const { session } = useAuthSession();
   const [editing, setEditing] = useState(false);
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
 
   const signOut = async () => {
     const ok = await confirm({
+      testID: 'sign-out-dialog',
       title: 'Sign out?',
       message: 'You will need to sign in again to place orders.',
       confirmLabel: 'Sign out',
@@ -188,6 +190,7 @@ export default function ProfileScreen() {
           }}
         />
       ) : null}
+      {confirmDialog}
     </Screen>
   );
 }

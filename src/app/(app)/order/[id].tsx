@@ -10,6 +10,7 @@ import { RateDriverCard } from '@/components/rate-driver-card';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -21,7 +22,6 @@ import { useNow } from '@/hooks/use-now';
 import { canHaveDelivery, useOrderDelivery } from '@/state/deliveries';
 import { cancelMyOrder, useOrder } from '@/state/orders';
 import { useDeliveryTracking } from '@/state/tracking';
-import { confirm } from '@/utils/confirm';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
 import { describeOrderPhase, searchingFor } from '@/utils/order-phase';
 import { outcomeReason, paymentStatusLabel } from '@/utils/order-outcome';
@@ -35,6 +35,7 @@ export default function OrderDetailScreen() {
   const tracking = useDeliveryTracking(delivery.data);
   const now = useNow(15_000);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const goToOrders = () => router.navigate('/orders');
@@ -72,16 +73,9 @@ export default function OrderDetailScreen() {
   const showDriver = !!driver && phase.key !== 'failed' && phase.key !== 'cancelled';
   const deliveryUnavailable = canHaveDelivery(current) && delivery.data === undefined && !!delivery.error;
 
+  // Confirmed in the kit Dialog (#155), so the choice looks the same everywhere and flows can reach it.
   const handleCancel = async () => {
-    const ok = await confirm({
-      title: 'Cancel this order?',
-      message: 'The restaurant will be notified and your order will stop.',
-      confirmLabel: 'Cancel order',
-      cancelLabel: 'Keep order',
-      destructive: true,
-    });
-    if (!ok) return;
-
+    setConfirmingCancel(false);
     setActionError(null);
     setCancelling(true);
     try {
@@ -97,7 +91,7 @@ export default function OrderDetailScreen() {
     <Screen
       footer={
         canCancel ? (
-          <AppButton testID="order-cancel" title="Cancel order" variant="danger" loading={cancelling} onPress={() => void handleCancel()} />
+          <AppButton testID="order-cancel" title="Cancel order" variant="danger" loading={cancelling} onPress={() => setConfirmingCancel(true)} />
         ) : placed ? (
           <AppButton title="View all orders" variant="secondary" onPress={goToOrders} />
         ) : undefined
@@ -221,6 +215,17 @@ export default function OrderDetailScreen() {
           </Card>
         ) : null}
       </ScrollView>
+      <Dialog
+        visible={confirmingCancel}
+        title="Cancel this order?"
+        message="The restaurant will be notified and your order will stop."
+        confirmLabel="Cancel order"
+        cancelLabel="Keep order"
+        destructive
+        onConfirm={() => void handleCancel()}
+        onCancel={() => setConfirmingCancel(false)}
+        testID="cancel-dialog"
+      />
     </Screen>
   );
 }
