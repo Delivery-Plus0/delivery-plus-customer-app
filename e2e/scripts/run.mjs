@@ -66,6 +66,7 @@ const SUITES = {
     'regression/profile-photo.yaml',
     'regression/phone-verification.yaml',
     'regression/order-payment-failed.yaml',
+    'regression/order-cancel.yaml',
     'regression/unauthorized-order.yaml',
     'regression/offline-recovery.yaml',
   ],
@@ -274,6 +275,17 @@ const actions = {
   // restaurant app, delivery-service dispatches on order.ready_for_pickup by itself, and the driver
   // works in the driver app.
 
+  // Regression set-up only (#155): a fresh paid order the kitchen hasn't started, so the customer can still cancel it.
+  'scenario/order-confirmed': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    await api('DELETE', '/api/cart', customer);
+    await api('POST', '/api/cart/items', customer, { menuItemId: manifest.menuItems['QA Pasta'], quantity: 1 });
+    const order = await api('POST', '/api/orders', customer, {});
+    const payment = await api('POST', '/api/payments', customer, { orderId: order.id });
+    await api('POST', `/api/payments/${payment.id}/process`, customer, { simulateFailure: false });
+    await waitForOrderStatus(order.id, customer, 'CONFIRMED');
+    state.orderId = order.id;
+  },
   // Regression set-up only: a ready order with no driver free (the QA driver goes offline first, in the
   // driver app). Placed through the API as the QA customer, then prepared and marked ready as the owner.
   'scenario/order-ready': async () => {

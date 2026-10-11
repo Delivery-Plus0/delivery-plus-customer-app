@@ -19,9 +19,10 @@ import { BrandColors, IconSize, Spacing } from '@/constants/theme';
 import type { MenuItem } from '@/services/menus';
 import { addToCart, isCartRestaurantConflict, replaceCartWith, setCartQuantity, useCart } from '@/state/cart';
 import { groupMenu, useMenu, useRestaurant } from '@/state/catalog';
-import { confirm } from '@/utils/confirm';
+import { useConfirm } from '@/hooks/use-confirm';
 
 export default function RestaurantScreen() {
+  const [confirmDialog, confirm] = useConfirm();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const restaurant = useRestaurant(id);
@@ -43,6 +44,7 @@ export default function RestaurantScreen() {
     } catch (error) {
       if (isCartRestaurantConflict(error)) {
         const startNew = await confirm({
+          testID: 'new-cart-dialog',
           title: 'Start a new cart?',
           message: `Your cart has items from another restaurant. Clear it and add ${item.name}?`,
           confirmLabel: 'Start new cart',
@@ -178,6 +180,7 @@ export default function RestaurantScreen() {
       />
       {backButton}
       <CartBar bottomInset={insets.bottom} />
+      {confirmDialog}
     </Screen>
   );
 }
