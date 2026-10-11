@@ -12,6 +12,8 @@ import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { AppNotification, NotificationType } from '@/services/notifications';
 import { loadMoreNotifications, markAllRead, markRead, unreadCount, useNotifications } from '@/state/notifications';
 import { formatRelativeTime } from '@/utils/format';
+import { t } from '@/i18n';
+import { notificationMessage, notificationTitle } from '@/utils/notification-text';
 
 const typeIcon: Record<NotificationType, IconName> = {
   ORDER_CONFIRMED: 'orders',
@@ -27,16 +29,16 @@ export default function NotificationsScreen() {
   const unread = unreadCount(notifications.data);
 
   const onError = (error: unknown) =>
-    setActionError(error instanceof Error ? error.message : 'Could not update notifications.');
+    setActionError(error instanceof Error ? error.message : t('Could not update notifications.'));
 
   const header = (
     <ScreenHeader
-      title="Notifications"
+      title={t('Notifications')}
       subtitle={unread > 0 ? `${unread} unread` : undefined}
       right={
         unread > 0 ? (
           <AppButton
-            title="Mark all read"
+            title={t('Mark all read')}
             icon="checkAll"
             variant="ghost"
             size="sm"
@@ -97,8 +99,8 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           <StateView
             icon="bell"
-            title="You're all caught up"
-            message="Order and delivery updates will show up here."
+            title={t("You're all caught up")}
+            message={t('Order and delivery updates will show up here.')}
           />
         }
       />
@@ -117,8 +119,8 @@ const NotificationRow = memo(function NotificationRow({
     <Pressable
       testID={`notification-${item.id}`} nativeID={`notification-${item.id}`}
       accessibilityRole="button"
-      accessibilityLabel={`${item.isRead ? '' : 'Unread. '}${item.title}. ${item.message}`}
-      accessibilityHint={item.isRead ? undefined : 'Marks this notification as read'}
+      accessibilityLabel={`${item.isRead ? '' : t('Unread.') + ' '}${notificationTitle(item)}. ${notificationMessage(item)}`}
+      accessibilityHint={item.isRead ? undefined : t('Marks this notification as read')}
       onPress={() => {
         if (!item.isRead) onPress(item.id);
       }}
@@ -134,14 +136,14 @@ const NotificationRow = memo(function NotificationRow({
       <View style={styles.body}>
         <View style={styles.titleRow}>
           <ThemedText type={item.isRead ? 'small' : 'smallBold'} style={styles.flex} numberOfLines={1}>
-            {item.title}
+            {notificationTitle(item)}
           </ThemedText>
           <ThemedText type="caption" themeColor="textSecondary">
             {formatRelativeTime(item.createdAt)}
           </ThemedText>
         </View>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-          {item.message}
+          {notificationMessage(item)}
         </ThemedText>
       </View>
       {!item.isRead ? <View style={styles.unreadDot} /> : null}

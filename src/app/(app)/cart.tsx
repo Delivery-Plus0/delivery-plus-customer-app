@@ -15,6 +15,7 @@ import { cartItemCount, emptyCart, setCartQuantity, useCart } from '@/state/cart
 import { useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { formatMoney } from '@/utils/format';
+import { t } from '@/i18n';
 
 export default function CartScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -28,34 +29,34 @@ export default function CartScreen() {
   const changeQuantity = (menuItemId: string, quantity: number) => {
     setActionError(null);
     setCartQuantity(menuItemId, quantity).catch((error: unknown) =>
-      setActionError(error instanceof Error ? error.message : 'Could not update your cart.'),
+      setActionError(error instanceof Error ? error.message : t('Could not update your cart.')),
     );
   };
 
   const handleClear = async () => {
     const ok = await confirm({
       testID: 'clear-cart-dialog',
-      title: 'Clear cart?',
-      message: 'This removes every item from your cart.',
-      confirmLabel: 'Clear cart',
+      title: t('Clear cart?'),
+      message: t('This removes every item from your cart.'),
+      confirmLabel: t('Clear cart'),
       destructive: true,
     });
     if (!ok) return;
 
     setActionError(null);
     emptyCart().catch((error: unknown) =>
-      setActionError(error instanceof Error ? error.message : 'Could not clear your cart.'),
+      setActionError(error instanceof Error ? error.message : t('Could not clear your cart.')),
     );
   };
 
   const header = (
     <ScreenHeader
-      title="Your cart"
-      subtitle={restaurant.data ? `From ${restaurant.data.name}` : undefined}
+      title={t('Your cart')}
+      subtitle={restaurant.data ? t('From {name}', { name: restaurant.data.name }) : undefined}
       showBack
       right={
         items.length > 0 ? (
-          <AppButton title="Clear" onPress={() => void handleClear()} variant="ghost" size="sm" fullWidth={false} />
+          <AppButton title={t('Clear')} onPress={() => void handleClear()} variant="ghost" size="sm" fullWidth={false} />
         ) : null
       }
     />
@@ -85,9 +86,9 @@ export default function CartScreen() {
         {header}
         <StateView
           icon="bag"
-          title="Your cart is empty"
-          message="Add dishes from a restaurant to start an order."
-          actionLabel="Browse restaurants"
+          title={t('Your cart is empty')}
+          message={t('Add dishes from a restaurant to start an order.')}
+          actionLabel={t('Browse restaurants')}
           onAction={() => router.navigate('/home')}
         />
       </Screen>
@@ -100,13 +101,13 @@ export default function CartScreen() {
         <View style={styles.footer}>
           <View style={styles.totalRow}>
             <ThemedText type="default" themeColor="textSecondary">
-              Subtotal · {count} {count === 1 ? 'item' : 'items'}
+              {count === 1 ? t('Subtotal · 1 item') : t('Subtotal · {count} items', { count })}
             </ThemedText>
             <ThemedText type="heading" testID="cart-subtotal">
               {formatMoney(cart.data.total)}
             </ThemedText>
           </View>
-          <AppButton testID="cart-checkout" title="Go to checkout" onPress={() => router.push('/checkout')} />
+          <AppButton testID="cart-checkout" title={t('Go to checkout')} onPress={() => router.push('/checkout')} />
         </View>
       }
     >
@@ -152,7 +153,7 @@ export default function CartScreen() {
         )}
         ListFooterComponent={
           <ThemedText type="caption" themeColor="textSecondary" style={styles.note}>
-            Your final total is confirmed when the order is placed.
+            {t('Your final total is confirmed when the order is placed.')}
           </ThemedText>
         }
       />

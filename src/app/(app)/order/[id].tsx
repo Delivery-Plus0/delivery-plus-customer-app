@@ -25,6 +25,7 @@ import { useDeliveryTracking } from '@/state/tracking';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
 import { describeOrderPhase, searchingFor } from '@/utils/order-phase';
 import { outcomeReason, paymentStatusLabel } from '@/utils/order-outcome';
+import { t } from '@/i18n';
 
 export default function OrderDetailScreen() {
   const { id, placed } = useLocalSearchParams<{ id: string; placed?: string }>();
@@ -39,7 +40,7 @@ export default function OrderDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const goToOrders = () => router.navigate('/orders');
-  const header = <ScreenHeader title={order.data ? `Order #${shortId(order.data.id)}` : 'Order'} showBack />;
+  const header = <ScreenHeader title={order.data ? t('Order #{id}', { id: shortId(order.data.id) }) : t('Order')} showBack />;
 
   if (order.isLoading) {
     return (
@@ -66,7 +67,7 @@ export default function OrderDetailScreen() {
   const eta = tracking.data?.eta;
   const etaNote =
     eta?.status === 'ESTIMATED' && now <= Date.parse(eta.validUntil)
-      ? `Arriving in about ${Math.max(1, Math.round(eta.seconds / 60))} min`
+      ? t('Arriving in about {minutes} min', { minutes: Math.max(1, Math.round(eta.seconds / 60)) })
       : null;
   const phaseNote = phase.key === 'searching' ? searchingFor(delivery.data?.createdAt, now) : etaNote;
   const driver = delivery.data?.driver;
@@ -81,7 +82,7 @@ export default function OrderDetailScreen() {
     try {
       await cancelMyOrder(current.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Could not cancel this order.');
+      setActionError(error instanceof Error ? error.message : t('Could not cancel this order.'));
     } finally {
       setCancelling(false);
     }
@@ -91,9 +92,9 @@ export default function OrderDetailScreen() {
     <Screen
       footer={
         canCancel ? (
-          <AppButton testID="order-cancel" title="Cancel order" variant="danger" loading={cancelling} onPress={() => setConfirmingCancel(true)} />
+          <AppButton testID="order-cancel" title={t('Cancel order')} variant="danger" loading={cancelling} onPress={() => setConfirmingCancel(true)} />
         ) : placed ? (
-          <AppButton title="View all orders" variant="secondary" onPress={goToOrders} />
+          <AppButton title={t('View all orders')} variant="secondary" onPress={goToOrders} />
         ) : undefined
       }
     >
@@ -112,7 +113,7 @@ export default function OrderDetailScreen() {
           />
         }
       >
-        {placed && live ? <InlineAlert testID="order-placed" tone="success" message="Order placed! We'll keep this page updated." /> : null}
+        {placed && live ? <InlineAlert testID="order-placed" tone="success" message={t("Order placed! We'll keep this page updated.")} /> : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
 
         <OrderPhaseCard phase={phase} note={phaseNote} />
@@ -124,7 +125,7 @@ export default function OrderDetailScreen() {
         {deliveryUnavailable ? (
           <InlineAlert
             testID="delivery-unavailable"
-            message="We couldn't load the delivery status. Pull down to try again."
+            message={t("We couldn't load the delivery status. Pull down to try again.")}
           />
         ) : null}
 
@@ -138,7 +139,7 @@ export default function OrderDetailScreen() {
 
         {canCancel ? (
           <ThemedText type="caption" themeColor="textSecondary" testID="order-cancel-hint">
-            You can cancel until the restaurant starts preparing your order.
+            {t('You can cancel until the restaurant starts preparing your order.')}
           </ThemedText>
         ) : null}
 
@@ -146,7 +147,7 @@ export default function OrderDetailScreen() {
           <View style={styles.rowBetween}>
             <View style={styles.flex}>
               <ThemedText type="defaultBold" numberOfLines={1}>
-                {restaurant.data?.name ?? 'Your order'}
+                {restaurant.data?.name ?? t('Your order')}
               </ThemedText>
               <ThemedText type="caption" themeColor="textSecondary">
                 {formatDateTime(current.createdAt)}
@@ -157,7 +158,7 @@ export default function OrderDetailScreen() {
         </Card>
 
         <Card>
-          <ThemedText type="heading">Items</ThemedText>
+          <ThemedText type="heading">{t('Items')}</ThemedText>
           {current.items.map((item) => (
             <View key={item.id ?? item.menuItemId} style={styles.rowBetween}>
               <ThemedText type="small" style={styles.flex}>
@@ -171,7 +172,7 @@ export default function OrderDetailScreen() {
             <>
               <View style={styles.rowBetween}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Subtotal
+                  {t('Subtotal')}
                 </ThemedText>
                 <ThemedText type="small" testID="order-subtotal">
                   {formatMoney(current.subtotalAmount)}
@@ -179,7 +180,7 @@ export default function OrderDetailScreen() {
               </View>
               <View style={styles.rowBetween}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  Delivery fee
+                  {t('Delivery fee')}
                 </ThemedText>
                 <ThemedText type="small" testID="order-delivery-fee" nativeID="order-delivery-fee">
                   {formatMoney(current.deliveryFee)}
@@ -188,14 +189,14 @@ export default function OrderDetailScreen() {
             </>
           ) : null}
           <View style={styles.rowBetween}>
-            <ThemedText type="heading">Total</ThemedText>
+            <ThemedText type="heading">{t('Total')}</ThemedText>
             <ThemedText type="heading" testID="order-total">
               {formatMoney(current.totalAmount)}
             </ThemedText>
           </View>
           <View style={styles.rowBetween}>
             <ThemedText type="small" themeColor="textSecondary">
-              Payment
+              {t('Payment')}
             </ThemedText>
             <ThemedText type="small" testID="order-payment-status" nativeID="order-payment-status">
               {paymentStatusLabel(current)}
@@ -206,7 +207,7 @@ export default function OrderDetailScreen() {
         {restaurant.data ? (
           <Card>
             <ThemedText type="caption" themeColor="textSecondary">
-              RESTAURANT
+              {t('RESTAURANT')}
             </ThemedText>
             <ThemedText type="defaultBold">{restaurant.data.name}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -217,10 +218,10 @@ export default function OrderDetailScreen() {
       </ScrollView>
       <Dialog
         visible={confirmingCancel}
-        title="Cancel this order?"
-        message="The restaurant will be notified and your order will stop."
-        confirmLabel="Cancel order"
-        cancelLabel="Keep order"
+        title={t('Cancel this order?')}
+        message={t('The restaurant will be notified and your order will stop.')}
+        confirmLabel={t('Cancel order')}
+        cancelLabel={t('Keep order')}
         destructive
         onConfirm={() => void handleCancel()}
         onCancel={() => setConfirmingCancel(false)}

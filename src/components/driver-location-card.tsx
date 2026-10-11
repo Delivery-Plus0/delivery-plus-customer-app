@@ -8,6 +8,7 @@ import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import type { useDeliveryTracking } from '@/state/tracking';
 import { describeConnection, describeTracking, mapLink, type TrackingView } from '@/utils/tracking';
+import { t } from '@/i18n';
 
 /** The tracking data source, owned by the screen so one screen opens one stream. */
 export type DeliveryTrackingResource = ReturnType<typeof useDeliveryTracking>;
@@ -40,7 +41,7 @@ export function DriverLocationCard({ tracking }: { tracking: DeliveryTrackingRes
           {"We couldn't load your driver's location."}
         </ThemedText>
         <Pressable accessibilityRole="button" onPress={() => void tracking.refresh()} hitSlop={8}>
-          <ThemedText type="linkPrimary">Retry</ThemedText>
+          <ThemedText type="linkPrimary">{t('Retry')}</ThemedText>
         </Pressable>
       </Card>
     );
@@ -52,7 +53,7 @@ export function DriverLocationCard({ tracking }: { tracking: DeliveryTrackingRes
 
   return (
     <Card testID="driver-location">
-      <View style={styles.row} accessible accessibilityLabel={`Driver location: ${view.title}. ${view.detail}`}>
+      <View style={styles.row} accessible accessibilityLabel={t('Driver location: {title}. {detail}', { title: view.title, detail: view.detail })}>
         <View style={[styles.iconWrap, live ? styles.iconWrapLive : styles.iconWrapMuted]}>
           <Icon
             name={ICONS[view.kind]}
@@ -62,7 +63,7 @@ export function DriverLocationCard({ tracking }: { tracking: DeliveryTrackingRes
         </View>
         <View style={styles.flex}>
           <ThemedText type="caption" themeColor="textSecondary">
-            DRIVER LOCATION
+            {t('DRIVER LOCATION')}
           </ThemedText>
           <View style={styles.titleRow}>
             {live ? <View style={styles.liveDot} /> : null}
@@ -89,7 +90,7 @@ export function DriverLocationCard({ tracking }: { tracking: DeliveryTrackingRes
             accessibilityRole="link"
             onPress={() => void Linking.openURL(mapLink(view.position.latitude, view.position.longitude))}
             hitSlop={8}>
-            <ThemedText type="linkPrimary">Open in maps</ThemedText>
+            <ThemedText type="linkPrimary">{t('Open in maps')}</ThemedText>
           </Pressable>
         </>
       ) : null}

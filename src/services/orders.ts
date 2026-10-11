@@ -34,6 +34,8 @@ export type Order = {
   cancelledBy?: 'CUSTOMER' | 'RESTAURANT' | 'SYSTEM' | 'PAYMENT' | null;
   /** The backend's own sentence for why it ended; shown as-is, never written by the app. */
   cancellationReason?: string | null;
+  /** #151: the restaurant's or platform's own words, without the English lead-in, for localized reasons. */
+  cancellationNote?: string | null;
   /** From the backend's payment events; null when not known (e.g. orders from before #143). */
   paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | null;
   /** The items as priced at checkout (#145); totalAmount = subtotalAmount + deliveryFee. */

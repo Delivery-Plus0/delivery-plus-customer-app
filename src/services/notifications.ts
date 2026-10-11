@@ -14,6 +14,9 @@ export type AppNotification = {
   type: NotificationType;
   title: string;
   message: string;
+  /** #151: what it says as a key + params, so it shows in the reader's language. Null on older ones. */
+  messageKey?: string | null;
+  params?: Record<string, string> | null;
   isRead: boolean;
   createdAt: string;
 };

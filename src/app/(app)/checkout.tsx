@@ -20,6 +20,7 @@ import { useOrderQuote } from '@/state/orders';
 import { useProfile } from '@/state/profile';
 import { isPhoneNotVerified } from '@/utils/phone-verification';
 import { formatMoney } from '@/utils/format';
+import { t } from '@/i18n';
 
 function createIdempotencyKey(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
@@ -56,26 +57,26 @@ export default function CheckoutScreen() {
 
       if (payment.status === 'FAILED') {
         setFailedOrderId(order.id);
-        setErrorMessage(payment.failureReason || 'Payment could not be completed.');
+        setErrorMessage(payment.failureReason ? t(payment.failureReason) : t('Payment could not be completed.'));
         return;
       }
 
       if (payment.status !== 'COMPLETED') {
         setFailedOrderId(order.id);
-        setErrorMessage('Payment is still processing. Check the order status before trying again.');
+        setErrorMessage(t('Payment is still processing. Check the order status before trying again.'));
         return;
       }
 
       router.replace({ pathname: '/order/[id]', params: { id: order.id, placed: '1' } });
     } catch (error) {
       setNeedsVerifiedPhone(isPhoneNotVerified(error));
-      setErrorMessage(error instanceof Error ? error.message : 'We could not place your order. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : t('We could not place your order. Please try again.'));
     } finally {
       setPlacingOrder(false);
     }
   };
 
-  const header = <ScreenHeader title="Checkout" showBack />;
+  const header = <ScreenHeader title={t('Checkout')} showBack />;
 
   if (cart.isLoading) {
     return (
@@ -103,9 +104,9 @@ export default function CheckoutScreen() {
         {header}
         <StateView
           icon="bag"
-          title="Your cart is empty"
-          message="Add items before checking out."
-          actionLabel="Browse restaurants"
+          title={t('Your cart is empty')}
+          message={t('Add items before checking out.')}
+          actionLabel={t('Browse restaurants')}
           onAction={() => router.navigate('/home')}
         />
       </Screen>
@@ -115,18 +116,18 @@ export default function CheckoutScreen() {
   const footer = failedOrderId ? (
     <AppButton
       testID="checkout-view-order"
-      title="View order status"
+      title={t('View order status')}
       variant="secondary"
       onPress={() => router.replace({ pathname: '/order/[id]', params: { id: failedOrderId } })}
     />
   ) : (
     <AppButton
       testID="checkout-place-order"
-      title={quote.data ? `Place order · ${formatMoney(quote.data.totalAmount)}` : 'Place order'}
+      title={quote.data ? t('Place order · {total}', { total: formatMoney(quote.data.totalAmount) }) : t('Place order')}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
       disabled={!quote.data}
-      accessibilityHint="Creates your order and charges the total shown"
+      accessibilityHint={t('Creates your order and charges the total shown')}
     />
   );
 
@@ -137,9 +138,9 @@ export default function CheckoutScreen() {
         {errorMessage ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
         {needsVerifiedPhone ? (
           profile.data?.phone ? (
-            <AppButton testID="checkout-verify-phone" title="Verify your phone" icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
+            <AppButton testID="checkout-verify-phone" title={t('Verify your phone')} icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
           ) : (
-            <AppButton testID="checkout-add-phone" title="Add your phone number" icon="phone" variant="secondary" onPress={() => router.navigate('/profile')} />
+            <AppButton testID="checkout-add-phone" title={t('Add your phone number')} icon="phone" variant="secondary" onPress={() => router.navigate('/profile')} />
           )
         ) : null}
 
@@ -150,7 +151,7 @@ export default function CheckoutScreen() {
             </View>
             <View style={styles.flex}>
               <ThemedText type="caption" themeColor="textSecondary">
-                ORDERING FROM
+                {t('ORDERING FROM')}
               </ThemedText>
               <ThemedText type="defaultBold">{restaurant.data.name}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
@@ -162,7 +163,7 @@ export default function CheckoutScreen() {
 
         {items.length > 0 ? (
           <Card>
-            <ThemedText type="heading">Order summary</ThemedText>
+            <ThemedText type="heading">{t('Order summary')}</ThemedText>
             {items.map((item) => (
               <View key={item.menuItemId} style={styles.itemRow}>
                 <ThemedText type="small" style={styles.flex}>
@@ -176,7 +177,7 @@ export default function CheckoutScreen() {
               <>
                 <View style={styles.itemRow}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Subtotal
+                    {t('Subtotal')}
                   </ThemedText>
                   <ThemedText type="small" testID="checkout-subtotal" nativeID="checkout-subtotal">
                     {formatMoney(quote.data.subtotalAmount)}
@@ -184,14 +185,14 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={styles.itemRow}>
                   <ThemedText type="small" themeColor="textSecondary">
-                    Delivery fee
+                    {t('Delivery fee')}
                   </ThemedText>
                   <ThemedText type="small" testID="checkout-delivery-fee" nativeID="checkout-delivery-fee">
                     {formatMoney(quote.data.deliveryFee)}
                   </ThemedText>
                 </View>
                 <View style={styles.itemRow}>
-                  <ThemedText type="heading">Total</ThemedText>
+                  <ThemedText type="heading">{t('Total')}</ThemedText>
                   <ThemedText type="heading" testID="checkout-total" nativeID="checkout-total">
                     {formatMoney(quote.data.totalAmount)}
                   </ThemedText>
@@ -200,7 +201,7 @@ export default function CheckoutScreen() {
             ) : quote.error ? (
               <InlineAlert
                 testID="checkout-quote-error"
-                message="We couldn't load the delivery fee, so the total isn't known yet."
+                message={t("We couldn't load the delivery fee, so the total isn't known yet.")}
                 onDismiss={() => void quote.refresh()}
               />
             ) : (
@@ -216,9 +217,9 @@ export default function CheckoutScreen() {
             <Icon name="check" size={IconSize.md} color={BrandColors.primaryText} />
           </View>
           <View style={styles.flex}>
-            <ThemedText type="defaultBold">Payment</ThemedText>
+            <ThemedText type="defaultBold">{t('Payment')}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Processed securely by Delivery Plus when you place the order.
+              {t('Processed securely by Delivery Plus when you place the order.')}
             </ThemedText>
           </View>
         </Card>

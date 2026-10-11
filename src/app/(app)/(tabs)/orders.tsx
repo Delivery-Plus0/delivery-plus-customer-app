@@ -14,13 +14,17 @@ import { ApiError } from '@/services/api';
 import { fetchOrdersPage, isActiveOrder, type Order, type OrderFilter } from '@/services/orders';
 import { useOrdersPage } from '@/state/orders';
 import { ORDER_FILTER_OPTIONS, mergeOrderPages } from '@/utils/order-outcome';
+import { t } from '@/i18n';
 
-const EMPTY_TITLES: Record<string, string> = {
-  all: 'No orders yet',
-  active: 'Nothing on the way',
-  completed: 'No delivered orders yet',
-  cancelled: 'No cancelled or failed orders',
-};
+// A function, so the titles follow the current language (#151).
+const emptyTitle = (filter: string): string =>
+  filter === 'active'
+    ? t('Nothing on the way')
+    : filter === 'completed'
+      ? t('No delivered orders yet')
+      : filter === 'cancelled'
+        ? t('No cancelled or failed orders')
+        : t('No orders yet');
 
 function buildSections(orders: Order[], filter: OrderFilter | null) {
   // The backend already returns newest first; "All" groups what is still going above the rest.
@@ -28,8 +32,8 @@ function buildSections(orders: Order[], filter: OrderFilter | null) {
   const active = orders.filter(isActiveOrder);
   const past = orders.filter((order) => !isActiveOrder(order));
   return [
-    ...(active.length ? [{ title: 'In progress', data: active }] : []),
-    ...(past.length ? [{ title: 'Past orders', data: past }] : []),
+    ...(active.length ? [{ title: t('In progress'), data: active }] : []),
+    ...(past.length ? [{ title: t('Past orders'), data: past }] : []),
   ];
 }
 
@@ -38,7 +42,7 @@ export default function OrdersScreen() {
 
   return (
     <Screen>
-      <ScreenHeader title="Orders" />
+      <ScreenHeader title={t('Orders')} />
       <View style={styles.filters} accessibilityRole="tablist">
         {ORDER_FILTER_OPTIONS.map((option) => {
           const selected = option.key === filter;
@@ -90,7 +94,7 @@ function OrdersList({ filter }: { filter: OrderFilter | null }) {
       const next = await fetchOrdersPage(filter, more.length + 2);
       setMore((pages) => [...pages, next.items ?? []]);
     } catch (caught) {
-      setMoreError(caught instanceof ApiError ? caught.message : 'Could not load more orders.');
+      setMoreError(caught instanceof ApiError ? caught.message : t('Could not load more orders.'));
     } finally {
       setLoadingMore(false);
     }
@@ -123,19 +127,19 @@ function OrdersList({ filter }: { filter: OrderFilter | null }) {
         <View style={styles.footer}>
           {moreError ? <InlineAlert message={moreError} testID="orders-more-error" /> : null}
           {orders.length < total ? (
-            <AppButton testID="orders-load-more" title="Load more" variant="secondary" loading={loadingMore} onPress={() => void loadMore()} />
+            <AppButton testID="orders-load-more" title={t('Load more')} variant="secondary" loading={loadingMore} onPress={() => void loadMore()} />
           ) : null}
         </View>
       }
       ListEmptyComponent={
         filter ? (
-          <StateView icon="orders" title={EMPTY_TITLES[filter]} testID="orders-empty" />
+          <StateView icon="orders" title={emptyTitle(filter)} testID="orders-empty" />
         ) : (
           <StateView
             icon="orders"
-            title={EMPTY_TITLES.all}
-            message="When you place an order, you can follow it here."
-            actionLabel="Find something to eat"
+            title={emptyTitle('all')}
+            message={t('When you place an order, you can follow it here.')}
+            actionLabel={t('Find something to eat')}
             onAction={() => router.navigate('/home')}
             testID="orders-empty"
           />

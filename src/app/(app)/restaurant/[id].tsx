@@ -20,6 +20,7 @@ import type { MenuItem } from '@/services/menus';
 import { addToCart, isCartRestaurantConflict, replaceCartWith, setCartQuantity, useCart } from '@/state/cart';
 import { groupMenu, useMenu, useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
+import { t } from '@/i18n';
 
 export default function RestaurantScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -45,9 +46,9 @@ export default function RestaurantScreen() {
       if (isCartRestaurantConflict(error)) {
         const startNew = await confirm({
           testID: 'new-cart-dialog',
-          title: 'Start a new cart?',
-          message: `Your cart has items from another restaurant. Clear it and add ${item.name}?`,
-          confirmLabel: 'Start new cart',
+          title: t('Start a new cart?'),
+          message: t('Your cart has items from another restaurant. Clear it and add {name}?', { name: item.name }),
+          confirmLabel: t('Start new cart'),
           destructive: true,
         });
         if (startNew) {
@@ -73,7 +74,7 @@ export default function RestaurantScreen() {
 
   const backButton = (
     <View style={[styles.floatingBack, { top: insets.top + Spacing.two }]}>
-      <IconButton icon="back" accessibilityLabel="Go back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} />
+      <IconButton icon="back" accessibilityLabel={t('Go back')} onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))} />
     </View>
   );
 
@@ -134,7 +135,7 @@ export default function RestaurantScreen() {
           </ThemedText>
         </View>
         {closed ? (
-          <InlineAlert tone="info" message="This restaurant isn't taking orders right now. You can still browse the menu." />
+          <InlineAlert tone="info" message={t("This restaurant isn't taking orders right now. You can still browse the menu.")} />
         ) : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
       </View>
@@ -174,7 +175,7 @@ export default function RestaurantScreen() {
           ) : menu.error ? (
             <ErrorState error={menu.error} onRetry={() => void menu.refresh()} />
           ) : (
-            <StateView icon="food" title="No menu yet" message="This restaurant hasn't published any dishes." />
+            <StateView icon="food" title={t('No menu yet')} message={t("This restaurant hasn't published any dishes.")} />
           )
         }
       />
@@ -190,7 +191,7 @@ function Divider() {
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return error instanceof Error ? error.message : t('Something went wrong. Please try again.');
 }
 
 const styles = StyleSheet.create({

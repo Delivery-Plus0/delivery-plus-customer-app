@@ -1,12 +1,13 @@
 import type { DeliveryTracking } from '@/services/tracking';
 import { isValidPosition, type LatLng } from '@/utils/map-tiles';
+import { t } from '@/i18n/core';
 
 /** "just now", "8 s ago", "3 min ago", "2 h ago". */
 export function formatLocationAge(seconds: number): string {
-  if (seconds < 5) return 'just now';
-  if (seconds < 60) return `${seconds} s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  return `${Math.floor(seconds / 3600)} h ago`;
+  if (seconds < 5) return t('just now');
+  if (seconds < 60) return t('{n} s ago', { n: seconds });
+  if (seconds < 3600) return t('{n} min ago', { n: Math.floor(seconds / 60) });
+  return t('{n} h ago', { n: Math.floor(seconds / 3600) });
 }
 
 /**
@@ -50,8 +51,8 @@ export type TrackingViewInput = {
  * - not open but polling keeps data fresh → "Updating every 10 s"
  */
 export function describeConnection(connection: TrackingViewInput['connection'], fresh: boolean): string | undefined {
-  if (connection === 'open') return 'Live updates';
-  if (connection === 'reconnecting') return fresh ? 'Updating every 10 s' : 'Reconnecting…';
+  if (connection === 'open') return t('Live updates');
+  if (connection === 'reconnecting') return fresh ? t('Updating every 10 s') : t('Reconnecting…');
   return undefined;
 }
 
@@ -79,24 +80,24 @@ export function describeTracking({ tracking, refreshFailed = false, fresh, now }
 
   switch (tracking.tracking) {
     case 'NO_DRIVER':
-      return { kind: 'finding', title: 'Finding a driver', detail: "Your driver's location appears here once one is assigned." };
+      return { kind: 'finding', title: t('Finding a driver'), detail: t("Your driver's location appears here once one is assigned.") };
     case 'AWAITING_LOCATION':
-      return { kind: 'awaiting', title: 'Driver assigned', detail: 'Waiting for location…' };
+      return { kind: 'awaiting', title: t('Driver assigned'), detail: t('Waiting for location…') };
     case 'LIVE':
     case 'STALE': {
       if (!isValidPosition(tracking.location)) {
-        return { kind: 'unavailable', title: 'Driver assigned', detail: "Your driver's location is unavailable right now." };
+        return { kind: 'unavailable', title: t('Driver assigned'), detail: t("Your driver's location is unavailable right now.") };
       }
       const position = { latitude: tracking.location.latitude, longitude: tracking.location.longitude };
-      const updated = `Updated ${formatLocationAge(currentLocationAge(tracking, now))}`;
+      const updated = t('Updated {age}', { age: formatLocationAge(currentLocationAge(tracking, now)) });
       if (tracking.tracking === 'LIVE' && current) {
-        return { kind: 'position', freshness: 'live', title: 'Live', detail: updated, position };
+        return { kind: 'position', freshness: 'live', title: t('Live'), detail: updated, position };
       }
       return {
         kind: 'position',
         freshness: 'stale',
-        title: 'Last known location',
-        detail: current ? updated : `${updated} · reconnecting…`,
+        title: t('Last known location'),
+        detail: current ? updated : t('{updated} · reconnecting…', { updated }),
         position,
       };
     }

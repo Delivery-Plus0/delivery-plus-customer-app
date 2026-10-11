@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/icon';
 import { BrandColors, Elevation, IconSize, Radius, Spacing } from '@/constants/theme';
 import { cartItemCount, useCart } from '@/state/cart';
 import { formatMoney } from '@/utils/format';
+import { t } from '@/i18n';
 
 /** Floating "View cart" bar shown while the cart has items. Renders nothing otherwise. */
 export function CartBar({ bottomInset = 0 }: { bottomInset?: number }) {
@@ -19,14 +20,14 @@ export function CartBar({ bottomInset = 0 }: { bottomInset?: number }) {
         testID="cart-bar"
         nativeID="cart-bar"
         accessibilityRole="button"
-        accessibilityLabel={`View cart, ${count} ${count === 1 ? 'item' : 'items'}, ${formatMoney(cart.total)}`}
+        accessibilityLabel={t('View cart, {count} items, {total}', { count, total: formatMoney(cart.total) })}
         onPress={() => router.push('/cart')}
         style={({ pressed }) => [styles.bar, pressed && styles.pressed]}
       >
         <View style={styles.count}>
           <Text style={styles.countText}>{count}</Text>
         </View>
-        <Text style={styles.label}>View cart</Text>
+        <Text style={styles.label}>{t('View cart')}</Text>
         <Text style={styles.total}>{formatMoney(cart.total)}</Text>
         <Icon name="chevronRight" size={IconSize.sm} color={BrandColors.onPrimary} />
       </Pressable>

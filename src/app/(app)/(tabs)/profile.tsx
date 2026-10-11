@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { FormTextInput } from '@/components/ui/form-text-input';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
+import { LanguageSwitch } from '@/components/ui/language-switch';
 import { Sheet } from '@/components/ui/sheet';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -20,6 +21,7 @@ import type { UserProfile } from '@/services/users';
 import { saveProfile, useProfile, changeAvatar, removeAvatar } from '@/state/profile';
 import { PHONE_HINT, formatPhone, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
 import { useConfirm } from '@/hooks/use-confirm';
+import { t } from '@/i18n';
 
 export default function ProfileScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -33,9 +35,9 @@ export default function ProfileScreen() {
   const signOut = async () => {
     const ok = await confirm({
       testID: 'sign-out-dialog',
-      title: 'Sign out?',
-      message: 'You will need to sign in again to place orders.',
-      confirmLabel: 'Sign out',
+      title: t('Sign out?'),
+      message: t('You will need to sign in again to place orders.'),
+      confirmLabel: t('Sign out'),
       destructive: true,
     });
     if (ok) await clearSession();
@@ -43,11 +45,11 @@ export default function ProfileScreen() {
 
   const header = (
     <ScreenHeader
-      title="Profile"
+      title={t('Profile')}
       right={
         profile.data && !editing ? (
           <AppButton
-            title="Edit"
+            title={t('Edit')}
             icon="edit"
             variant="ghost"
             size="sm"
@@ -77,7 +79,7 @@ export default function ProfileScreen() {
         {header}
         <ErrorState error={profile.error} onRetry={() => void profile.refresh()} />
         <View style={styles.signOutFallback}>
-          <AppButton title="Sign out" icon="logout" variant="secondary" onPress={() => void signOut()} />
+          <AppButton title={t('Sign out')} icon="logout" variant="secondary" onPress={() => void signOut()} />
         </View>
       </Screen>
     );
@@ -121,26 +123,26 @@ export default function ProfileScreen() {
               onCancel={() => setEditing(false)}
               onSaved={() => {
                 setEditing(false);
-                setNotice('Profile updated.');
+                setNotice(t('Profile updated.'));
               }}
             />
           ) : (
             <Card>
-              <DetailRow icon="person" label="Full name" value={profile.data.fullName} />
-              <DetailRow icon="mail" label="Email" value={profile.data.email} />
+              <DetailRow icon="person" label={t('Full name')} value={profile.data.fullName} />
+              <DetailRow icon="mail" label={t('Email')} value={profile.data.email} />
               <DetailRow
                 icon="phone"
-                label="Phone"
+                label={t('Phone')}
                 value={formatPhone(profile.data.phone)}
-                placeholder="Add a phone number"
+                placeholder={t('Add a phone number')}
                 trailing={
                   profile.data.phone ? (
                     profile.data.phoneVerifiedAt ? (
-                      <Badge label="Verified" tone="success" testID="profile-phone-status" />
+                      <Badge label={t('Verified')} tone="success" testID="profile-phone-status" />
                     ) : (
                       <AppButton
                         testID="profile-verify-phone"
-                        title="Verify"
+                        title={t('Verify')}
                         variant="secondary"
                         size="sm"
                         fullWidth={false}
@@ -152,9 +154,9 @@ export default function ProfileScreen() {
               />
               <DetailRow
                 icon="location"
-                label="Delivery address"
+                label={t('Delivery address')}
                 value={profile.data.address}
-                placeholder="Add your address"
+                placeholder={t('Add your address')}
                 last
               />
             </Card>
@@ -162,10 +164,13 @@ export default function ProfileScreen() {
 
           {!editing ? (
             <>
+              <Card>
+                <LanguageSwitch />
+              </Card>
               <ThemedText type="caption" themeColor="textSecondary" style={styles.meta}>
-                Signed in as {session?.user.role === 'CUSTOMER' ? 'a customer' : session?.user.role}
+                {session?.user.role === 'CUSTOMER' ? t('Signed in as a customer') : t('Signed in as {role}', { role: session?.user.role ?? '' })}
               </ThemedText>
-              <AppButton testID="profile-sign-out" title="Sign out" icon="logout" variant="danger" onPress={() => void signOut()} />
+              <AppButton testID="profile-sign-out" title={t('Sign out')} icon="logout" variant="danger" onPress={() => void signOut()} />
             </>
           ) : null}
         </ScrollView>
@@ -176,7 +181,7 @@ export default function ProfileScreen() {
           onClose={() => setVerifySheet(false)}
           onVerified={() => {
             setVerifySheet(false);
-            setNotice('Phone verified.');
+            setNotice(t('Phone verified.'));
           }}
         />
       ) : null}
@@ -208,21 +213,21 @@ function PhotoSheet({ profile, onClose, onDone }: { profile: UserProfile; onClos
       const result = await action();
       if (result !== null) onDone(message);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'That did not go through. Try again.');
+      setError(caught instanceof Error ? caught.message : t('That did not go through. Try again.'));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Sheet visible title="Profile photo" onClose={onClose} testID="photo-sheet">
+    <Sheet visible title={t('Profile photo')} onClose={onClose} testID="photo-sheet">
       {error ? <InlineAlert message={error} testID="photo-error" /> : null}
-      <AppButton testID="photo-library" title="Choose from library" icon="person" loading={busy} onPress={() => void run(() => changeAvatar('library'), 'Photo updated.')} />
+      <AppButton testID="photo-library" title={t('Choose from library')} icon="person" loading={busy} onPress={() => void run(() => changeAvatar('library'), 'Photo updated.')} />
       {Platform.OS !== 'web' ? (
-        <AppButton testID="photo-camera" title="Take a photo" variant="secondary" disabled={busy} onPress={() => void run(() => changeAvatar('camera'), 'Photo updated.')} />
+        <AppButton testID="photo-camera" title={t('Take a photo')} variant="secondary" disabled={busy} onPress={() => void run(() => changeAvatar('camera'), 'Photo updated.')} />
       ) : null}
       {profile.avatarUrl ? (
-        <AppButton testID="photo-remove" title="Remove photo" variant="danger" disabled={busy} onPress={() => void run(() => removeAvatar(), 'Photo removed.')} />
+        <AppButton testID="photo-remove" title={t('Remove photo')} variant="danger" disabled={busy} onPress={() => void run(() => removeAvatar(), 'Photo removed.')} />
       ) : null}
     </Sheet>
   );
@@ -241,7 +246,7 @@ function Avatar({ profile, onPress }: { profile: UserProfile; onPress: () => voi
       style={styles.avatar}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={profile.avatarUrl ? 'Change or remove your photo' : 'Add a profile photo'}
+      accessibilityLabel={profile.avatarUrl ? t('Change or remove your photo') : t('Add a profile photo')}
       testID="profile-avatar"
       nativeID="profile-avatar">
       {profile.avatarUrl ? (
@@ -304,7 +309,7 @@ function EditProfileForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nameError = fullName.trim() ? undefined : 'Full name is required';
+  const nameError = fullName.trim() ? undefined : t('Full name is required');
   const phoneProblem = phoneError(phone);
 
   const handleSave = async () => {
@@ -316,7 +321,7 @@ function EditProfileForm({
       await saveProfile({ fullName: fullName.trim(), phone: normalizeEgyptianMobile(phone) ?? '', address: address.trim() });
       onSaved();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save your profile.');
+      setError(caught instanceof Error ? caught.message : t('Could not save your profile.'));
     } finally {
       setSaving(false);
     }
@@ -326,7 +331,7 @@ function EditProfileForm({
     <Card>
       {error ? <InlineAlert message={error} /> : null}
       <FormTextInput
-        label="Full name"
+        label={t('Full name')}
         value={fullName}
         onChangeText={setFullName}
         autoCapitalize="words"
@@ -335,32 +340,32 @@ function EditProfileForm({
         error={nameError}
       />
       <FormTextInput
-        label="Phone"
+        label={t('Phone')}
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
         autoComplete="tel"
         textContentType="telephoneNumber"
-        placeholder="Optional"
-        hint={PHONE_HINT}
+        placeholder={t('Optional')}
+        hint={t(PHONE_HINT)}
         error={phoneProblem}
       />
       <FormTextInput
-        label="Delivery address"
+        label={t('Delivery address')}
         value={address}
         onChangeText={setAddress}
         autoComplete="street-address"
         textContentType="fullStreetAddress"
-        placeholder="Street, building, apartment"
+        placeholder={t('Street, building, apartment')}
         multiline
         style={styles.addressInput}
       />
       <View style={styles.formActions}>
         <View style={styles.flex}>
-          <AppButton title="Cancel" variant="secondary" onPress={onCancel} disabled={saving} />
+          <AppButton title={t('Cancel')} variant="secondary" onPress={onCancel} disabled={saving} />
         </View>
         <View style={styles.flex}>
-          <AppButton title="Save" onPress={() => void handleSave()} loading={saving} disabled={Boolean(nameError)} />
+          <AppButton title={t('Save')} onPress={() => void handleSave()} loading={saving} disabled={Boolean(nameError)} />
         </View>
       </View>
     </Card>

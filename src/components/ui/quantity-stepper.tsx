@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
+import { t } from '@/i18n';
 
 type QuantityStepperProps = {
   quantity: number;
@@ -19,7 +20,7 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
       <Pressable
         testID={testID && `${testID}-decrease`} nativeID={testID && `${testID}-decrease`}
         accessibilityRole="button"
-        accessibilityLabel={quantity <= 1 ? `Remove ${itemName}` : `Decrease ${itemName}`}
+        accessibilityLabel={quantity <= 1 ? t('Remove {name}', { name: itemName }) : t('Decrease {name}', { name: itemName })}
         disabled={disabled}
         hitSlop={6}
         onPress={() => onChange(quantity - 1)}
@@ -33,7 +34,7 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
       <Pressable
         accessibilityRole="button"
         testID={testID && `${testID}-increase`} nativeID={testID && `${testID}-increase`}
-        accessibilityLabel={`Increase ${itemName}`}
+        accessibilityLabel={t('Increase {name}', { name: itemName })}
         disabled={disabled}
         hitSlop={6}
         onPress={() => onChange(quantity + 1)}
