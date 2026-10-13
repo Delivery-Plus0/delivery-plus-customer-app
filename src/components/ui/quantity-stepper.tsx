@@ -9,12 +9,15 @@ type QuantityStepperProps = {
   onChange: (next: number) => void;
   itemName: string;
   disabled?: boolean;
+  /** The highest quantity allowed; + is disabled there. */
+  max?: number;
   /** Prefix for `<prefix>-decrease`, `<prefix>-value`, `<prefix>-increase` test ids. */
   testID?: string;
 };
 
 /** −/qty/+ control. Going below 1 asks the caller to remove the line (quantity 0). */
-export function QuantityStepper({ quantity, onChange, itemName, disabled = false, testID }: QuantityStepperProps) {
+export function QuantityStepper({ quantity, onChange, itemName, disabled = false, max, testID }: QuantityStepperProps) {
+  const atMax = max !== undefined && quantity >= max;
   return (
     <View style={styles.row} testID={testID} nativeID={testID}>
       <Pressable
@@ -35,10 +38,11 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
         accessibilityRole="button"
         testID={testID && `${testID}-increase`} nativeID={testID && `${testID}-increase`}
         accessibilityLabel={t('Increase {name}', { name: itemName })}
-        disabled={disabled}
+        accessibilityState={{ disabled: disabled || atMax }}
+        disabled={disabled || atMax}
         hitSlop={6}
         onPress={() => onChange(quantity + 1)}
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.button, pressed && styles.pressed, atMax && styles.atMax]}
       >
         <Icon name="plus" size={IconSize.sm} color={BrandColors.primaryText} />
       </Pressable>
@@ -47,6 +51,9 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
 }
 
 const styles = StyleSheet.create({
+  atMax: {
+    opacity: 0.4,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

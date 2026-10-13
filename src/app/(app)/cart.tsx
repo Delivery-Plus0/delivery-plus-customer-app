@@ -12,6 +12,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
 import { cartItemCount, emptyCart, setCartQuantity, useCart } from '@/state/cart';
+import { MAX_ITEM_QUANTITY } from '@/services/cart';
 import { useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { formatMoney } from '@/utils/format';
@@ -139,7 +140,7 @@ export default function CartScreen() {
                 {item.name}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                {formatMoney(item.price)} each
+                {t('{price} each', { price: formatMoney(item.price) })}
               </ThemedText>
               <ThemedText type="smallBold">{formatMoney(item.price * item.quantity)}</ThemedText>
             </View>
@@ -147,6 +148,7 @@ export default function CartScreen() {
               testID={`cart-qty-${item.name}`}
               quantity={item.quantity}
               itemName={item.name}
+              max={MAX_ITEM_QUANTITY}
               onChange={(next) => changeQuantity(item.menuItemId, next)}
             />
           </Card>

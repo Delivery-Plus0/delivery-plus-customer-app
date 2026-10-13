@@ -13,6 +13,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { submitCheckout } from '@/services/checkout';
+import { isCartChanged } from '@/utils/cart-changes';
 import { reloadCart, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
 import { invalidateResources } from '@/state/resource-cache';
@@ -30,7 +31,10 @@ export default function CheckoutScreen() {
   const cart = useCart();
   const restaurant = useRestaurant(cart.data?.restaurantId ?? undefined);
   // The fee and total come from the backend's quote of this exact cart, never from app math (#145).
-  const cartSignature = cart.data?.items.length ? cart.data.items.map((item) => `${item.menuItemId}x${item.quantity}`).join(',') : null;
+  // Prices are part of it: after a 409 CartChanged the cart holds new prices and the quote must follow (#42).
+  const cartSignature = cart.data?.items.length
+    ? cart.data.items.map((item) => `${item.menuItemId}x${item.quantity}@${item.price}`).join(',')
+    : null;
   const quote = useOrderQuote(cartSignature);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,6 +73,13 @@ export default function CheckoutScreen() {
 
       router.replace({ pathname: '/order/[id]', params: { id: order.id, placed: '1' } });
     } catch (error) {
+      // #42: the menu changed since these items went into the cart. The backend already updated the
+      // cart; reload it (and with it the quote), so the next tap pays the total the customer now sees.
+      if (isCartChanged(error)) {
+        void reloadCart();
+        setErrorMessage(t('Your cart changed: a price, an item or a quantity is different now. Check your order and place it again.'));
+        return;
+      }
       setNeedsVerifiedPhone(isPhoneNotVerified(error));
       setErrorMessage(error instanceof Error ? error.message : t('We could not place your order. Please try again.'));
     } finally {
