@@ -1,5 +1,8 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/services/api';
 
+/** The most of one item a cart may hold; the backend enforces the same cap (#42). */
+export const MAX_ITEM_QUANTITY = 20;
+
 export type CartItem = {
   menuItemId: string;
   name: string;

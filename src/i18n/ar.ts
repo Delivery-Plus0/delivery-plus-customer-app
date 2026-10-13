@@ -247,6 +247,11 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Remove {name}': 'إزالة {name}',
   'Decrease {name}': 'تقليل {name}',
   'Increase {name}': 'زيادة {name}',
+  '{price} each': '{price} للواحدة',
+
+  // Checkout re-validation (#42)
+  'Your cart changed: a price, an item or a quantity is different now. Check your order and place it again.':
+    'تغيّرت سلتك: سعر أو صنف أو كمية أصبحت مختلفة. راجع طلبك ثم أكمله مرة أخرى.',
   'Start a new cart?': 'بدء سلة جديدة؟',
   'Your cart has items from another restaurant. Clear it and add {name}?': 'في سلتك أصناف من مطعم آخر. هل تريد تفريغها وإضافة {name}؟',
   'Start new cart': 'بدء سلة جديدة',

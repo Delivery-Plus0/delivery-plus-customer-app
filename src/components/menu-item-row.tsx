@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon';
 import { QuantityStepper } from '@/components/ui/quantity-stepper';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { MenuItem } from '@/services/menus';
+import { MAX_ITEM_QUANTITY } from '@/services/cart';
 import { formatMoney } from '@/utils/format';
 import { t } from '@/i18n';
 
@@ -62,6 +63,7 @@ export const MenuItemRow = memo(function MenuItemRow({
             testID={`qty-${item.name}`}
             quantity={quantityInCart}
             itemName={item.name}
+            max={MAX_ITEM_QUANTITY}
             onChange={(next) => onChangeQuantity(item, next)}
           />
         ) : (
