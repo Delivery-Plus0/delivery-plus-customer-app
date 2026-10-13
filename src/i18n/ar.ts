@@ -35,6 +35,10 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Order picked up': 'تم استلام الطلب من المطعم',
   'Order delivered': 'تم توصيل الطلب',
   'Order cancelled': 'تم إلغاء الطلب',
+  'Payment declined': 'تم رفض الدفع',
+  'Refund issued': 'تم استرداد المبلغ',
+  'Your payment for order {id} was declined, so the order was not placed.': 'تم رفض الدفع للطلب {id}، لذلك لم يتم تقديم الطلب.',
+  'We refunded {amount} for your order {id}.': 'رددنا لك {amount} عن طلبك {id}.',
   'Your order {id} has been confirmed.': 'تم تأكيد طلبك {id}.',
   'We received your payment for order {id}.': 'استلمنا دفعتك للطلب {id}.',
   'A driver is on the way to pick up your order {id}.': 'سائق في الطريق لاستلام طلبك {id}.',
@@ -114,6 +118,7 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Payment pending': 'الدفع قيد المعالجة',
   'Payment declined · you were not charged': 'تم رفض الدفع · لم يُخصم منك شيء',
   'Not paid yet': 'لم يُدفع بعد',
+  'Refunded in full · {amount}': 'تم استرداد المبلغ بالكامل · {amount}',
   'Not recorded': 'غير مسجّل',
 
   // Order screen
@@ -131,6 +136,8 @@ export const appArabic: Readonly<Record<string, string>> = {
   RESTAURANT: 'المطعم',
   'Cancel this order?': 'إلغاء هذا الطلب؟',
   'The restaurant will be notified and your order will stop.': 'سيتم إبلاغ المطعم وإيقاف طلبك.',
+  'The restaurant will be notified and your order will stop. You get a full refund, delivery fee included.':
+    'سيتم إبلاغ المطعم وإيقاف طلبك. ستسترد المبلغ بالكامل بما فيه رسوم التوصيل.',
   'Keep order': 'الإبقاء على الطلب',
 
   // Driver and tracking

@@ -18,6 +18,15 @@ describe('notification text (#151)', () => {
     expect(notificationMessage(bySystem)).toBe('Delivery Plus cancelled your order ABCDEF12.');
   });
 
+  it('tells the customer about a declined payment and a refund with its amount (#56)', () => {
+    const declined = { ...base, messageKey: 'payment.failed', params: { orderId: 'abcdef12' } };
+    expect(notificationTitle(declined)).toBe('Payment declined');
+    expect(notificationMessage(declined)).toBe('Your payment for order ABCDEF12 was declined, so the order was not placed.');
+    const refunded = { ...base, messageKey: 'payment.refunded', params: { orderId: 'abcdef12', amount: '225.00', currency: 'EGP' } };
+    expect(notificationTitle(refunded)).toBe('Refund issued');
+    expect(notificationMessage(refunded)).toBe('We refunded EGP\u00a0225.00 for your order ABCDEF12.');
+  });
+
   it('shows older notifications as stored', () => {
     expect(notificationTitle(base)).toBe('Order Confirmed');
     expect(notificationMessage({ ...base, messageKey: null })).toBe(base.message);

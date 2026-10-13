@@ -1,6 +1,6 @@
 import { t } from '@/i18n/core';
 import type { AppNotification } from '@/services/notifications';
-import { shortId } from '@/utils/format';
+import { formatMoney, shortId } from '@/utils/format';
 
 type Localizable = Pick<AppNotification, 'title' | 'message' | 'messageKey' | 'params'>;
 
@@ -22,6 +22,10 @@ export function notificationTitle(notification: Localizable): string {
       return t('Order delivered');
     case 'order.cancelled':
       return t('Order cancelled');
+    case 'payment.failed':
+      return t('Payment declined');
+    case 'payment.refunded':
+      return t('Refund issued');
     default:
       return notification.title;
   }
@@ -47,6 +51,11 @@ export function notificationMessage(notification: Localizable): string {
         return params.note ? t('Delivery Plus cancelled your order {id}: {note}', { id, note: params.note }) : t('Delivery Plus cancelled your order {id}.', { id });
       }
       return params.note ? t('The restaurant cancelled your order {id}: {note}', { id, note: params.note }) : t('The restaurant cancelled your order {id}.', { id });
+    case 'payment.failed':
+      return t('Your payment for order {id} was declined, so the order was not placed.', { id });
+    case 'payment.refunded':
+      // #56: the whole payment, items and delivery fee, back to the customer.
+      return t('We refunded {amount} for your order {id}.', { id, amount: formatMoney(params.amount) });
     default:
       return notification.message;
   }
