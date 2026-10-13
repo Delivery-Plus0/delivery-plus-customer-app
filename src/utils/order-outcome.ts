@@ -1,5 +1,6 @@
 import type { Order, OrderFilter } from '@/services/orders';
 import { t } from '@/i18n/core';
+import { formatMoney } from '@/utils/format';
 
 // Getters, so the labels follow the current language (#151).
 export const ORDER_FILTER_OPTIONS: { key: OrderFilter | null; label: string; testID: string }[] = [
@@ -60,8 +61,11 @@ export function outcomeReason(order: Pick<Order, 'status' | 'cancellationReason'
 }
 
 /** The payment line of the summary, from the backend's payment status for this order. */
-export function paymentStatusLabel(order: Pick<Order, 'status' | 'paymentStatus'>): string {
+export function paymentStatusLabel(order: Pick<Order, 'status' | 'paymentStatus' | 'totalAmount'>): string {
   switch (order.paymentStatus) {
+    case 'REFUNDED':
+      // #56: always the whole payment, items and delivery fee.
+      return t('Refunded in full · {amount}', { amount: formatMoney(order.totalAmount) });
     case 'COMPLETED':
       return t('Paid');
     case 'PENDING':

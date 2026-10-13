@@ -37,7 +37,7 @@ export type Order = {
   /** #151: the restaurant's or platform's own words, without the English lead-in, for localized reasons. */
   cancellationNote?: string | null;
   /** From the backend's payment events; null when not known (e.g. orders from before #143). */
-  paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | null;
+  paymentStatus?: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | null;
   /** The items as priced at checkout (#145); totalAmount = subtotalAmount + deliveryFee. */
   subtotalAmount?: string | null;
   /** The delivery fee applied at checkout (#145); 0 for orders from before fees. */

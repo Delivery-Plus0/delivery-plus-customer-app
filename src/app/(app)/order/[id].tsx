@@ -219,7 +219,11 @@ export default function OrderDetailScreen() {
       <Dialog
         visible={confirmingCancel}
         title={t('Cancel this order?')}
-        message={t('The restaurant will be notified and your order will stop.')}
+        message={
+          current.paymentStatus === 'COMPLETED'
+            ? t('The restaurant will be notified and your order will stop. You get a full refund, delivery fee included.')
+            : t('The restaurant will be notified and your order will stop.')
+        }
         confirmLabel={t('Cancel order')}
         cancelLabel={t('Keep order')}
         destructive

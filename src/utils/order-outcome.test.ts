@@ -34,6 +34,11 @@ describe('paymentStatusLabel', () => {
     expect(paymentStatusLabel(order({ paymentStatus: 'COMPLETED' }))).toBe('Paid');
     expect(paymentStatusLabel(order({ paymentStatus: 'PENDING' }))).toBe('Payment pending');
     expect(paymentStatusLabel(order({ paymentStatus: 'FAILED' }))).toBe('Payment declined · you were not charged');
+    expect(paymentStatusLabel(order({ status: 'CANCELLED', paymentStatus: 'REFUNDED', totalAmount: '225.00' }))).toBe('Refunded in full · EGP\u00a0225.00');
+  });
+
+  it('never claims a refund the backend has not recorded', () => {
+    expect(paymentStatusLabel(order({ status: 'CANCELLED', paymentStatus: 'COMPLETED' }))).toBe('Paid');
   });
 
   it('does not guess when the status is unknown', () => {
