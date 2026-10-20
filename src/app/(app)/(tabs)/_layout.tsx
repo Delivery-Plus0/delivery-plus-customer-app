@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { BrandColors } from '@/constants/theme';
+import { BrandColors, TabBar } from '@/constants/theme';
 import { unreadCount, useNotifications } from '@/state/notifications';
 import { t } from '@/i18n';
 
@@ -24,8 +24,9 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: BrandColors.primaryText,
         tabBarInactiveTintColor: BrandColors.textSecondary,
-        tabBarStyle: { backgroundColor: BrandColors.surface, borderTopColor: BrandColors.border },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        // #53: shared tab-bar sizes leave room for the whole label on the web.
+        tabBarStyle: [{ backgroundColor: BrandColors.surface, borderTopColor: BrandColors.border }, TabBar.style],
+        tabBarLabelStyle: TabBar.labelStyle,
         sceneStyle: { backgroundColor: BrandColors.background },
       }}
     >
