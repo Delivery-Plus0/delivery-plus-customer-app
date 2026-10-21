@@ -1,8 +1,35 @@
-# Delivery Plus — Customer App
+<p align="center">
+  <img src="./identity/app-icon.png" alt="Delivery Plus app icon" width="72">
+  &nbsp;&nbsp;
+  <img src="./identity/delivery-plus-logo.png" alt="Delivery Plus" width="300">
+</p>
 
-The customer-facing client of **Delivery Plus**, a food-delivery platform. Customers browse restaurants, build a cart, check out, pay and follow their order until it's delivered.
+<h1 align="center">Delivery Plus Customer App</h1>
+
+<p align="center">Browse restaurants, build a cart, check out and follow every order through delivery.</p>
+
+<p align="center">
+  <strong>DELIVERY PLUS</strong>
+  &nbsp; × &nbsp;
+  <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-57-000020?logo=expo&logoColor=white" alt="Built with Expo 57"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Delivery-Plus0/delivery-plus-customer-app"><img src="https://img.shields.io/badge/GitHub-Customer%20App-181717?logo=github&logoColor=white" alt="Customer app on GitHub"></a>
+  <img src="https://img.shields.io/badge/React%20Native-0.86-20232A?logo=react&logoColor=61DAFB" alt="React Native 0.86">
+  <img src="https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-2E7D32" alt="Platforms: Android, iOS and web">
+</p>
 
 Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs on Android, iOS and the web. The app talks only to the Delivery Plus API gateway. The backend (12 NestJS services, PostgreSQL, Redis, Kafka) lives in [Delivery-Plus0/delivery-plus](https://github.com/Delivery-Plus0/delivery-plus).
+
+## App gallery
+
+<p align="center">
+  <a href="./identity/mobile-screens.png"><img src="./identity/mobile-screens.png" alt="Four rounded phone mockups showing customer discovery, menu, checkout and live tracking" width="850"></a>
+</p>
+
+Four real screens from the running app, presented in rounded phone frames. Captured at phone width from the web build with seeded QA data.
 
 ## Features
 
