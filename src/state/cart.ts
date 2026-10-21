@@ -1,4 +1,5 @@
 import { useResource } from '@/hooks/use-resource';
+import { t } from '@/i18n/core';
 import { ApiError } from '@/services/api';
 import { addCartItem, clearCart, fetchCart, removeCartItem, updateCartItem, type Cart } from '@/services/cart';
 import { fetchResource, getResource, setResourceData } from '@/state/resource-cache';
@@ -32,9 +33,23 @@ export function cartItemCount(cart: Cart | undefined): number {
   return cart?.items.reduce((count, item) => count + item.quantity, 0) ?? 0;
 }
 
-/** True when the backend refused the add because the cart holds another restaurant's items. */
+/**
+ * True when the backend refused the add because the cart holds another restaurant's items. Only that
+ * 409 (`Conflict`) offers a new cart; `CartWriteConflict` (#205) and `CartChanged` mean something else.
+ */
 export function isCartRestaurantConflict(error: unknown): boolean {
-  return error instanceof ApiError && error.statusCode === 409;
+  return error instanceof ApiError && error.statusCode === 409 && error.error === 'Conflict';
+}
+
+/** True when another change to the same cart won the race (#205): nothing was applied, so trying again is safe. */
+export function isCartWriteConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.statusCode === 409 && error.error === 'CartWriteConflict';
+}
+
+/** What to tell the person when a cart change failed. */
+export function describeCartError(error: unknown, fallback: string): string {
+  if (isCartWriteConflict(error)) return t('Your cart was changing at the same time. Please try again.');
+  return error instanceof Error ? t(error.message) : fallback;
 }
 
 export async function addToCart(menuItemId: string, quantity = 1): Promise<Cart> {

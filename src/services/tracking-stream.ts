@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { refreshSession } from '@/services/api';
 import { getSessionSnapshot } from '@/services/session';
 import { streamingFetch } from '@/services/stream-fetch';
 import type { DeliveryTracking } from '@/services/tracking';
@@ -57,16 +58,22 @@ const FINAL_STATUSES = new Set([401, 403, 404]);
  * Opens `GET /api/tracking/delivery/:id/stream` (backend #135) with the session token and reports
  * through `handlers`; exactly one of onFailure/onEnd ends it. Returns `close()`, after which nothing
  * is reported. Transport only: what the snapshots mean is decided elsewhere (describeTracking).
+ *
+ * An expired access token (#34) is refreshed like any API call: a 401 when connecting refreshes the
+ * session and connects once more with the new token; a 401 inside the stream refreshes it and reports
+ * a retryable drop, so the next connection uses the new token. Only an ended session is final.
  */
 export function openTrackingStream(
   deliveryId: string,
   handlers: TrackingStreamHandlers,
   fetchImpl: typeof streamingFetch = streamingFetch,
+  refresh: typeof refreshSession = refreshSession,
 ): () => void {
   const controller = new AbortController();
   let done = false;
   let sawEnded = false;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
+  let refreshing: Promise<void> | null = null;
 
   const finish = (outcome: StreamFailure | 'end') => {
     if (done) return;
@@ -79,6 +86,15 @@ export function openTrackingStream(
   const touch = () => {
     if (watchdog) clearTimeout(watchdog);
     watchdog = setTimeout(() => finish({ kind: 'retry' }), STREAM_INACTIVITY_MS);
+  };
+
+  /** The token expired inside the stream: refresh, then let the next connection use the new one. */
+  const refreshThenRetry = () => {
+    controller.abort();
+    refreshing ??= refresh().then(
+      (outcome) => finish(outcome === 'ended' ? { kind: 'auth', statusCode: 401 } : { kind: 'retry', statusCode: 401 }),
+      () => finish({ kind: 'retry', statusCode: 401 }),
+    );
   };
 
   const parse = createSseParser(({ event, data }) => {
@@ -99,11 +115,12 @@ export function openTrackingStream(
       } catch {
         statusCode = undefined;
       }
-      finish({ kind: statusCode && FINAL_STATUSES.has(statusCode) ? 'auth' : 'retry', statusCode });
+      if (statusCode === 401) refreshThenRetry();
+      else finish({ kind: statusCode && FINAL_STATUSES.has(statusCode) ? 'auth' : 'retry', statusCode });
     }
   });
 
-  void (async () => {
+  const connect = async (refreshed: boolean): Promise<void> => {
     const token = getSessionSnapshot().session?.token;
     if (!token) {
       finish({ kind: 'auth', statusCode: 401 });
@@ -115,6 +132,13 @@ export function openTrackingStream(
         headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
+      if (response.status === 401 && !refreshed) {
+        const outcome = await refresh();
+        if (done) return;
+        if (outcome === 'refreshed') return connect(true);
+        finish(outcome === 'ended' ? { kind: 'auth', statusCode: 401 } : { kind: 'retry', statusCode: 401 });
+        return;
+      }
       if (!response.ok || !response.body) {
         finish({ kind: FINAL_STATUSES.has(response.status) ? 'auth' : 'retry', statusCode: response.status });
         return;
@@ -128,13 +152,14 @@ export function openTrackingStream(
         if (streamDone) break;
         touch();
         parse(decoder.decode(value, { stream: true }));
-        if (done) return;
+        if (done || refreshing) return;
       }
-      finish(sawEnded ? 'end' : { kind: 'retry' });
+      if (!refreshing) finish(sawEnded ? 'end' : { kind: 'retry' });
     } catch {
-      finish({ kind: 'retry' });
+      if (!refreshing) finish({ kind: 'retry' });
     }
-  })();
+  };
+  void connect(false);
 
   return () => {
     if (done) return;

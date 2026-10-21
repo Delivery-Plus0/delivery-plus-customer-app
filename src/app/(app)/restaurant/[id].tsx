@@ -17,7 +17,7 @@ import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Spacing } from '@/constants/theme';
 import type { MenuItem } from '@/services/menus';
-import { addToCart, isCartRestaurantConflict, replaceCartWith, setCartQuantity, useCart } from '@/state/cart';
+import { addToCart, describeCartError, isCartRestaurantConflict, replaceCartWith, setCartQuantity, useCart } from '@/state/cart';
 import { groupMenu, useMenu, useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { t } from '@/i18n';
@@ -191,7 +191,7 @@ function Divider() {
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : t('Something went wrong. Please try again.');
+  return describeCartError(error, t('Something went wrong. Please try again.'));
 }
 
 const styles = StyleSheet.create({
