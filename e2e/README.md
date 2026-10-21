@@ -36,6 +36,13 @@ the business flow).
 It always exports with `--clear`: a warm Metro cache can keep a previously inlined
 `EXPO_PUBLIC_API_BASE_URL` and silently point the build at the dev gateway.
 
+**Sessions (#34).** The `session` suite stays signed in for six minutes of 60-second access tokens, then signs out. It needs a stack started with short tokens, and refuses to run otherwise:
+
+```bash
+JWT_EXPIRES_IN=60s npm run e2e:env:up   # in ../delivery-plus (or restart only auth-service with it)
+npm run e2e:session -- --headless
+```
+
 Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volumes).
 
 ## Suites
@@ -44,6 +51,7 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 | --- | --- | --- |
 | `smoke` | login → Home · search → restaurant → menu · add → change quantity → total · cart → checkout → order | every PR |
 | `regression` | **cross-app:** the driver goes offline in the driver app, a ready order waits ("Finding a driver"), the driver goes online in the driver app and the customer sees "Driver assigned" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session | nightly / manual |
+| `session` | **60-second access tokens:** signed in for six minutes, reloading screens that need the API after every token expiry (five refreshes) · sign out → welcome screen, and a reload stays signed out | every PR and nightly, after the main suite, with auth-service restarted at `JWT_EXPIRES_IN=60s` |
 | `business` | **three apps, no API stand-ins**: customer orders in the customer app → the order appears on the **restaurant app**'s kitchen board → *Start preparing* → *Ready for pickup* in the restaurant app → automatic dispatch waits until the driver goes online **in the driver app** → driver app shows the job (pickup, drop-off, items) and shares its location → customer sees "Driver assigned" and the location is in the customer's tracking view → driver app: picked up, start, delivered, each seen in the customer app → Delivered → integrity check (one delivery, no new dead letters) → confirmation notification | nightly / manual |
 
 ## Test data (from `npm run seed:e2e`)
@@ -108,11 +116,10 @@ Redis only, so repeated sign-ins don't hit the 5/min login limit.
 
 ### CI
 
-The driver and restaurant apps are private repos, which `GITHUB_TOKEN` can't read. The workflow
-checks them out with the secret `CLIENT_APPS_READ_TOKEN` (fine-grained, Contents: read on
-`delivery-plus-driver-app` and `delivery-plus-restaurant-app`).
-Without the secret, the cross-app flows are **skipped with a warning** (`E2E_SKIP_CROSS_APP=1`); PR
-smoke doesn't need it.
+The driver and restaurant apps are public repos, so the workflow checks them out (`dev`, or
+`DRIVER_APP_REF` / `RESTAURANT_APP_REF`) without a token for every suite except smoke. PRs run
+smoke only; the nightly and manual runs include the cross-app flows. `E2E_SKIP_CROSS_APP=1` still
+skips them on a machine without the other apps.
 
 ## Selectors
 

@@ -123,7 +123,7 @@ The E2E suites cover the customer journey (smoke), failure paths, authorization 
 | --- | --- |
 | CI | `npm ci`, typecheck, lint, unit tests, web export (catches broken imports and render-time errors) |
 | E2E (Maestro) | Pull requests: smoke suite against the backend E2E stack. Nightly and manual: every suite |
-| Security | `npm audit` (blocks on critical) and a Trivy filesystem/secret scan |
+| Security | CodeQL, `npm audit` (blocks on critical) and a Trivy filesystem/secret scan |
 
 ## Branches and contributing
 
