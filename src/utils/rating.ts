@@ -1,4 +1,4 @@
-import { t } from '@/i18n/core';
+import { t, tn } from '@/i18n/core';
 export const RATING_SCORES = [1, 2, 3, 4, 5] as const;
 export const RATING_COMMENT_MAX = 500;
 
@@ -26,7 +26,7 @@ export function ratingPrompt(displayName: string | null | undefined): string {
 }
 
 export function scoreLabel(score: number): string {
-  const stars = score === 1 ? t('1 star') : t('{n} stars', { n: score });
+  const stars = tn(score, '{count} star', '{count} stars');
   const word = scoreWord(score);
   return word ? `${stars} · ${word}` : stars;
 }

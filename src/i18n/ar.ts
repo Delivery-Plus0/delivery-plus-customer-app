@@ -1,3 +1,5 @@
+import type { ArabicPluralForms } from './core';
+
 /** Arabic for this app's own text (#151): English text → Arabic. The kit's strings are in kit-ar.ts. */
 export const appArabic: Readonly<Record<string, string>> = {
   // Tabs and navigation
@@ -178,8 +180,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   Excellent: 'ممتاز',
   'How was your delivery with {name}?': 'كيف كان التوصيل مع {name}؟',
   'How was your delivery?': 'كيف كان التوصيل؟',
-  '1 star': 'نجمة واحدة',
-  '{n} stars': '{n} نجوم',
   'Keep it under {max} characters': 'اجعله أقل من {max} حرف',
 
   // Profile
@@ -237,8 +237,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Your cart is empty': 'سلتك فارغة',
   'Add dishes from a restaurant to start an order.': 'أضف أطباقًا من مطعم لتبدأ طلبك.',
   'Browse restaurants': 'تصفح المطاعم',
-  'Subtotal · 1 item': 'المجموع · صنف واحد',
-  'Subtotal · {count} items': 'المجموع · {count} أصناف',
   'Go to checkout': 'متابعة الدفع',
   'Your final total is confirmed when the order is placed.': 'يتم تأكيد الإجمالي النهائي عند إرسال الطلب.',
   'View cart, {count} items, {total}': 'عرض السلة، {count} أصناف، {total}',
@@ -310,4 +308,24 @@ export const appArabic: Readonly<Record<string, string>> = {
     'اكتشف أكلات منطقتك المفضلة، وجهّز سلتك في ثوانٍ، وتابع طلبك من المطبخ إلى بابك.',
   'Get started': 'ابدأ',
   'I already have an account': 'لدي حساب بالفعل',
+};
+
+/** #27: counted nouns for tn(), keyed by the English plural; Arabic needs all six forms. */
+export const appArabicPlurals: Readonly<Record<string, ArabicPluralForms>> = {
+  'Subtotal · {count} items': {
+    zero: 'المجموع · لا أصناف',
+    one: 'المجموع · صنف واحد',
+    two: 'المجموع · صنفان',
+    few: 'المجموع · {count} أصناف',
+    many: 'المجموع · {count} صنفًا',
+    other: 'المجموع · {count} صنف',
+  },
+  '{count} stars': {
+    zero: 'بلا نجوم',
+    one: 'نجمة واحدة',
+    two: 'نجمتان',
+    few: '{count} نجوم',
+    many: '{count} نجمة',
+    other: '{count} نجمة',
+  },
 };
