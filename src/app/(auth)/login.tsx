@@ -11,14 +11,18 @@ import { API_BASE_URL } from '@/config/api';
 import { Spacing } from '@/constants/theme';
 import { loginAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
+import { isEmailNotVerified, startEmailVerification, takeVerifiedEmail } from '@/utils/email-verification';
 import { describeLoginError } from '@/utils/login-errors';
 import { t } from '@/i18n';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  // Coming back from the code screen: the email is filled in and the person is told it worked.
+  const [verifiedEmail] = useState(takeVerifiedEmail);
+  const [email, setEmail] = useState(verifiedEmail ?? '');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState({ email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
+  const [notice, setNotice] = useState<string | null>(verifiedEmail ? t('Email verified. Sign in to continue.') : null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failures, setFailures] = useState(0);
@@ -37,12 +41,20 @@ export default function LoginScreen() {
 
     inFlight.current = true;
     setError(null);
+    setNotice(null);
     setIsSubmitting(true);
     try {
       const auth = await loginAccount({ email: email.trim(), password });
       await setSession(auth.accessToken, auth.refreshToken);
       router.replace('/home');
     } catch (caught) {
+      // #252: the password was right, but the email still needs its code.
+      if (isEmailNotVerified(caught)) {
+        startEmailVerification(email.trim(), null);
+        // replace, not push: one sign-in screen at a time (the code screen comes back to a fresh one).
+        router.replace('/verify-email');
+        return;
+      }
       const consecutiveFailures = failures + 1;
       setFailures(consecutiveFailures);
       setError(describeLoginError(caught, consecutiveFailures));
@@ -111,6 +123,11 @@ export default function LoginScreen() {
         onSubmitEditing={() => void handleSubmit()}
       />
 
+      {notice ? (
+        <View style={styles.alert}>
+          <InlineAlert message={notice} tone="success" testID="login-notice" />
+        </View>
+      ) : null}
       {error ? (
         <View style={styles.alert}>
           <InlineAlert message={error} testID="login-error" />

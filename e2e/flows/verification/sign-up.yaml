@@ -1,0 +1,73 @@
+url: ${APP_URL}
+name: Sign-up with email verification on - the code screen, a wrong code, the right code, then sign-in
+tags:
+  - verification
+---
+# A new address for this run; registering it in the UI emails a code (kept by the test sender).
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: verification/new-email
+- openLink: ${APP_URL}/register
+- extendedWaitUntil:
+    visible:
+      id: register-full-name
+    timeout: 20000
+- tapOn:
+    id: register-full-name
+- inputText: E2E Code
+- tapOn:
+    id: register-email
+- inputText: ${output.control.newEmail}
+- tapOn:
+    id: register-password
+- inputText: ${PASSWORD}
+- tapOn:
+    id: register-submit
+
+# No tokens yet: the code screen, for the address just used, with the resend countdown running.
+- extendedWaitUntil:
+    visible:
+      id: verify-email-screen
+    timeout: 20000
+- assertVisible: 'Enter the 6-digit code we sent to .*e2e\.code\..*'
+- assertVisible: 'The code works for 10 minutes\.'
+- assertVisible: 'Resend code in [0-9]+ s'
+
+# A wrong code is refused with its own message.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: verification/read-email-code
+- tapOn:
+    id: verify-email-code
+- inputText: ${output.control.wrongCode}
+- tapOn:
+    id: verify-email-submit
+- extendedWaitUntil:
+    visible:
+      id: verify-email-error
+    timeout: 15000
+- assertVisible: "That code isn.t right\\. Check the email and try again\\."
+
+# The right code verifies the email; sign-in shows it filled in.
+- tapOn:
+    id: verify-email-code
+- eraseText: 10
+- inputText: ${output.control.code}
+- tapOn:
+    id: verify-email-submit
+- extendedWaitUntil:
+    visible:
+      id: login-notice
+    timeout: 15000
+- assertVisible: 'Email verified\. Sign in to continue\.'
+- tapOn:
+    id: login-password
+- inputText: ${PASSWORD}
+- tapOn:
+    id: login-submit
+- extendedWaitUntil:
+    visible:
+      id: restaurant-QA Kitchen
+    timeout: 20000

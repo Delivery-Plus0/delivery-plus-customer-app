@@ -140,6 +140,19 @@ jobs:
         if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
         run: node e2e/scripts/run.mjs --suite session --headless
 
+      # #66: the code screen needs email verification on (backend #252). Only auth-service changes, and
+      # its access tokens go back to the default.
+      - name: Restart auth-service with email verification required
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        working-directory: backend
+        env:
+          EMAIL_VERIFICATION_REQUIRED: 'true'
+        run: docker compose -p delivery-plus-e2e -f docker-compose.base.yml -f docker-compose.test.yml -f docker-compose.e2e.yml up -d --no-deps --wait --wait-timeout 180 auth-service
+
+      - name: Run Maestro verification suite (email code screen)
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        run: node e2e/scripts/run.mjs --suite verification --headless
+
       - name: Collect backend logs
         if: failure()
         working-directory: backend

@@ -11,6 +11,7 @@ import { Spacing } from '@/constants/theme';
 import { ApiError } from '@/services/api';
 import { registerAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
+import { startEmailVerification } from '@/utils/email-verification';
 import { PHONE_HINT, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
 import { t } from '@/i18n';
 
@@ -24,7 +25,6 @@ export default function RegisterScreen() {
   const [touched, setTouched] = useState<Record<Field, boolean>>({ fullName: false, email: false, phone: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const emailRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
@@ -49,9 +49,9 @@ export default function RegisterScreen() {
     if (Object.values(errors).some(Boolean) || isSubmitting) return;
 
     setError(null);
-    setNotice(null);
     setIsSubmitting(true);
     try {
+      const requestedAt = Date.now();
       const auth = await registerAccount({
         email: email.trim(),
         password,
@@ -61,8 +61,9 @@ export default function RegisterScreen() {
         role: 'CUSTOMER',
       });
       if ('verificationRequired' in auth) {
-        // #203: the account exists, but signing in waits for the emailed code.
-        setNotice(t('Your account is ready. Check your email for a verification code, then sign in.'));
+        // #203: the account exists, and registering emailed a code; signing in waits for it.
+        startEmailVerification(email.trim(), requestedAt);
+        router.replace('/verify-email');
         return;
       }
       await setSession(auth.accessToken, auth.refreshToken);
@@ -92,6 +93,7 @@ export default function RegisterScreen() {
       }
     >
       <FormTextInput
+        testID="register-full-name"
         label={t('Full name')}
         value={fullName}
         onChangeText={setFullName}
@@ -106,6 +108,7 @@ export default function RegisterScreen() {
         onSubmitEditing={() => emailRef.current?.focus()}
       />
       <FormTextInput
+        testID="register-email"
         ref={emailRef}
         label={t('Email')}
         value={email}
@@ -123,6 +126,7 @@ export default function RegisterScreen() {
         onSubmitEditing={() => phoneRef.current?.focus()}
       />
       <FormTextInput
+        testID="register-phone"
         ref={phoneRef}
         label={t('Phone')}
         value={phone}
@@ -139,6 +143,7 @@ export default function RegisterScreen() {
         onSubmitEditing={() => passwordRef.current?.focus()}
       />
       <FormTextInput
+        testID="register-password"
         ref={passwordRef}
         label={t('Password')}
         value={password}
@@ -155,16 +160,11 @@ export default function RegisterScreen() {
 
       {error ? (
         <View style={styles.alert}>
-          <InlineAlert message={error} />
-        </View>
-      ) : null}
-      {notice ? (
-        <View style={styles.alert}>
-          <InlineAlert message={notice} tone="info" testID="register-notice" />
+          <InlineAlert message={error} testID="register-error" />
         </View>
       ) : null}
 
-      <AppButton title={t('Create account')} onPress={() => void handleSubmit()} loading={isSubmitting} />
+      <AppButton testID="register-submit" title={t('Create account')} onPress={() => void handleSubmit()} loading={isSubmitting} />
     </AuthFormShell>
   );
 }
