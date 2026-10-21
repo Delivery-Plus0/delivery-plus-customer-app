@@ -5,6 +5,8 @@ name: E2E (Maestro)
 #   app → Maestro (headless Chromium) → artifacts.
 #
 # - Pull requests run the smoke suite (critical customer path, ~4 min of flows).
+# - Every run then restarts auth-service with 60-second access tokens and runs the session suite
+#   (#34): six minutes signed in across five refreshes, and sign-out.
 # - A nightly schedule and manual runs execute everything: smoke + regression (failure paths,
 #   authorization, offline recovery) + the business cycle across the customer, restaurant and driver
 #   apps.
@@ -13,10 +15,8 @@ name: E2E (Maestro)
 # seed:e2e` (added alongside this workflow; see planning.md → E2E automation).
 #
 # Cross-app flows drive the real driver app (regression/order-awaiting-driver, business) and the real
-# restaurant app (business). Both live in private repos, which GITHUB_TOKEN can't read, so they need
-# the secret CLIENT_APPS_READ_TOKEN (fine-grained token: Contents read-only on
-# delivery-plus-driver-app and delivery-plus-restaurant-app). Without it they are skipped with a
-# warning; smoke on PRs never needs it.
+# restaurant app (business). Both repos are public, so they are checked out without a token for
+# every suite except smoke (PRs run smoke only).
 
 on:
   pull_request:
@@ -50,7 +50,6 @@ env:
   RESTAURANT_APP_REPOSITORY: ${{ vars.RESTAURANT_APP_REPOSITORY || 'Delivery-Plus0/delivery-plus-restaurant-app' }}
   RESTAURANT_APP_REF: ${{ vars.RESTAURANT_APP_REF || 'dev' }}
   RESTAURANT_APP_DIR: ${{ github.workspace }}/restaurant-app
-  HAS_CLIENT_APPS_TOKEN: ${{ secrets.CLIENT_APPS_READ_TOKEN != '' }}
 
 jobs:
   maestro-web:
@@ -102,33 +101,44 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check out driver app (cross-app flows)
-        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
+        if: env.SUITE != 'smoke'
         uses: actions/checkout@v7
         with:
           repository: ${{ env.DRIVER_APP_REPOSITORY }}
           ref: ${{ env.DRIVER_APP_REF }}
-          token: ${{ secrets.CLIENT_APPS_READ_TOKEN }}
           path: driver-app
 
       - name: Check out restaurant app (cross-app flows)
-        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
+        if: env.SUITE != 'smoke'
         uses: actions/checkout@v7
         with:
           repository: ${{ env.RESTAURANT_APP_REPOSITORY }}
           ref: ${{ env.RESTAURANT_APP_REF }}
-          token: ${{ secrets.CLIENT_APPS_READ_TOKEN }}
           path: restaurant-app
 
       - name: Install driver and restaurant apps
-        if: env.SUITE != 'smoke' && env.HAS_CLIENT_APPS_TOKEN == 'true'
+        if: env.SUITE != 'smoke'
         run: |
           (cd driver-app && npm ci --no-audit --no-fund)
           (cd restaurant-app && npm ci --no-audit --no-fund)
 
       - name: Run Maestro suite (customer app + restaurant app + driver app)
+        id: suite
         run: node e2e/scripts/run.mjs --suite "$SUITE" --build --headless
+
+      # #34: the session suite needs short access tokens. Only auth-service changes; the data stays.
+      - name: Restart auth-service with 60-second access tokens
+        # Also after a failed main suite (its web build is reused), but not when the stack never started.
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        working-directory: backend
         env:
-          E2E_SKIP_CROSS_APP: ${{ env.HAS_CLIENT_APPS_TOKEN == 'true' && '0' || '1' }}
+          JWT_EXPIRES_IN: 60s
+        run: docker compose -p delivery-plus-e2e -f docker-compose.base.yml -f docker-compose.test.yml -f docker-compose.e2e.yml up -d --no-deps --wait --wait-timeout 180 auth-service
+
+      - name: Run Maestro session suite (60-second access tokens)
+        # Also after a failed main suite (its web build is reused), but not when the stack never started.
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        run: node e2e/scripts/run.mjs --suite session --headless
 
       - name: Collect backend logs
         if: failure()

@@ -7,6 +7,7 @@ import { STREAM_INACTIVITY_MS, createSseParser, openTrackingStream, type Trackin
 
 vi.mock('@/services/stream-fetch', () => ({ streamingFetch: vi.fn() }));
 vi.mock('@/services/session', () => ({ getSessionSnapshot: vi.fn(() => ({ session: { token: 'jwt-1' } })) }));
+vi.mock('@/services/api', () => ({ refreshSession: vi.fn(async () => 'ended') }));
 
 /** A response whose body the test feeds chunk by chunk. */
 function streamingResponse(status = 200) {
@@ -133,6 +134,78 @@ describe('openTrackingStream', () => {
       await flush();
       expect(r.calls).toEqual(['open', `failure:${kind}:${statusCode}`]);
     }
+  });
+
+  describe('an expired access token (#34)', () => {
+    const signedInAs = (token: string) =>
+      vi.mocked(getSessionSnapshot).mockReturnValue({ session: { token } } as ReturnType<typeof getSessionSnapshot>);
+
+    it('a 401 when connecting refreshes the session and reconnects once with the new token', async () => {
+      const s = streamingResponse();
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(streamingResponse(401).response)
+        .mockResolvedValueOnce(s.response);
+      const refresh = vi.fn(async () => {
+        signedInAs('jwt-2');
+        return 'refreshed' as const;
+      });
+      const r = recorder();
+
+      openTrackingStream('d-1', r.handlers, fetchImpl as never, refresh);
+      await flush();
+
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(fetchImpl.mock.calls[1][1]).toMatchObject({ headers: { Authorization: 'Bearer jwt-2' } });
+      expect(r.calls).toEqual(['open']);
+      s.push(frame({ tracking: 'LIVE' }));
+      await flush();
+      expect(r.snapshots).toHaveLength(1);
+    });
+
+    it('reconnects only once: a second 401 with the new token is final', async () => {
+      const fetchImpl = vi.fn(async () => streamingResponse(401).response);
+      const refresh = vi.fn(async () => 'refreshed' as const);
+      const r = recorder();
+
+      openTrackingStream('d-1', r.handlers, fetchImpl as never, refresh);
+      await flush();
+
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(r.calls).toEqual(['failure:auth:401']);
+    });
+
+    it.each([
+      ['ended', 'auth'],
+      ['unavailable', 'retry'],
+    ] as const)('a refresh that is %s → %s failure', async (outcome, kind) => {
+      const fetchImpl = vi.fn(async () => streamingResponse(401).response);
+      const r = recorder();
+
+      openTrackingStream('d-1', r.handlers, fetchImpl as never, vi.fn(async () => outcome));
+      await flush();
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(r.calls).toEqual([`failure:${kind}:401`]);
+    });
+
+    it.each([
+      ['refreshed', 'retry'],
+      ['ended', 'auth'],
+    ] as const)('a 401 inside the stream refreshes the session; %s → %s, so the next connection has the new token', async (outcome, kind) => {
+      const s = streamingResponse();
+      const refresh = vi.fn(async () => outcome);
+      const r = recorder();
+
+      openTrackingStream('d-1', r.handlers, vi.fn(async () => s.response) as never, refresh);
+      await flush();
+      s.push('event: error\ndata: {"statusCode":401,"message":"Expired token"}\n\n');
+      await flush();
+
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(r.calls).toEqual(['open', `failure:${kind}:401`]);
+    });
   });
 
   it('a network failure (offline, gateway down) → retry', async () => {

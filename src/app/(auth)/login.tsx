@@ -40,7 +40,7 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     try {
       const auth = await loginAccount({ email: email.trim(), password });
-      await setSession(auth.accessToken);
+      await setSession(auth.accessToken, auth.refreshToken);
       router.replace('/home');
     } catch (caught) {
       const consecutiveFailures = failures + 1;

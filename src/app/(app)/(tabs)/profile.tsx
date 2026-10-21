@@ -16,7 +16,8 @@ import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
-import { clearSession, useAuthSession } from '@/services/session';
+import { signOut as endSession } from '@/services/api';
+import { useAuthSession } from '@/services/session';
 import type { UserProfile } from '@/services/users';
 import { saveProfile, useProfile, changeAvatar, removeAvatar } from '@/state/profile';
 import { PHONE_HINT, formatPhone, normalizeEgyptianMobile, phoneError } from '@/utils/phone';
@@ -40,7 +41,7 @@ export default function ProfileScreen() {
       confirmLabel: t('Sign out'),
       destructive: true,
     });
-    if (ok) await clearSession();
+    if (ok) await endSession();
   };
 
   const header = (

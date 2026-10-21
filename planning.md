@@ -30,7 +30,7 @@ Events go through a transactional outbox; the customer follows the driver live o
 | 2 · Kafka reliability | 🟡 core merged (#103); outbox #98 done (#126 + reconciliation #127). Open: #23 versioned event contracts |
 | 3 · Automatic dispatch + driver contracts | ✅ complete: #33 (#107), #95 (#108), #96 (#109), #97 (#110) |
 | 4 · Driver + restaurant clients | ✅ complete: driver app #99 (driver #15, #16; customer #19), restaurant app #100 (restaurant #6, #7) |
-| 5 · Full business flow E2E | ✅ **complete (milestone closed 2026-10-12)**. #13 closed: the backend Integration job runs the API critical path in CI, each app runs Maestro smoke in CI, and the three-app UI flow runs locally. `CLIENT_APPS_READ_TOKEN` would add the cross-app UI flow to GitHub CI (optional) |
+| 5 · Full business flow E2E | ✅ **complete (milestone closed 2026-10-12)**. #13 closed: the backend Integration job runs the API critical path in CI, each app runs Maestro smoke in CI, and the three-app UI flow runs locally. the nightly and manual E2E runs include the cross-app UI flow on GitHub since the app repos went public (2026-10-21) |
 | 6 · Notifications + push | 🟡 in-app notifications for every stage, plus restaurant/system cancellations with the reason (#5, #154), localized via `messageKey` + `params` (#189). Open: push and its retries (#50), preferences (#51) |
 | 7 · Real-time tracking | ✅ complete:<ul><li>lifecycle (#32)</li><li>customer map (#132)</li><li>realtime SSE with polling fallback (#134)</li><li>assignment + ETA contracts (#46)</li><li>location trust boundaries (#60)</li></ul> |
 | Product sprint · Business & UX | ✅ **complete (16/16, milestone closed 2026-10-11)**, see §5 |
@@ -55,13 +55,13 @@ Events go through a transactional outbox; the customer follows the driver live o
   - Every order carries a drop-off address copied at checkout (#108).
   - A driver gets their job, with pickup, drop-off, items and next action, from `GET /api/deliveries/me/current` (#109).
 - **Kafka reliability (#103):** events keyed by `orderId` with deterministic ids; durable deduplication in Redis (AOF); dead-letter topics with replay; retry-safe delivery actions.
-- **Customer app (private repo, `dev`):** everything above, plus login sends one request per submit and shows actionable errors. CI runs typecheck, lint, vitest (202), `kit:check -- --remote` and Maestro smoke.
-- **Driver app (private repo, `dev`):**
+- **Customer app (public repo, `dev`):** everything above, plus login sends one request per submit and shows actionable errors. CI runs typecheck, lint, vitest (202), `kit:check -- --remote` and Maestro smoke.
+- **Driver app (public repo, `dev`):**
   - DRIVER-only sign-in; sign-up with first-use vehicle registration; online/offline.
   - A dashboard with the current job and confirmations for each step (pickup → start → complete); directions; location sharing.
   - History; a wallet (50 % of the fee, PENDING for 12 h, then AVAILABLE); a profile with photo, phone verification, vehicle and review status.
   - Maestro smoke 6/6 locally; smoke green in GitHub CI.
-- **Restaurant app (private repo, `dev`):**
+- **Restaurant app (public repo, `dev`):**
   - Owner-only sign-in and restaurant selection.
   - Orders board (preparing → ready, polled) with today's summary, order details and reject with a reason (CONFIRMED only).
   - Menu editor: categories, items, photos, availability, archive.
@@ -195,7 +195,7 @@ Events go through a transactional outbox; the customer follows the driver live o
 | B10 | Cancellation and refund policy not decided: customer cancel window (the API allows up to pickup), automatic refunds for rejected or cancelled paid orders, fee refund, reversing the driver's pending earning | #53, #56 and the refund work | Owner (decision) |
 | B11 | Password reset channel not decided: email, or SMS on the #153 code infrastructure | #35 | Owner (decision) |
 | B12 | No SMS provider configured | Phone verification in production; turning on `PHONE_VERIFICATION_REQUIRED` | Owner (provider + credentials) |
-| B9 | Cross-app UI flows skipped on GitHub until the customer repo has `CLIENT_APPS_READ_TOKEN`. **No longer blocks #13** (closed: the backend Integration job and per-app Maestro smoke cover CI; the three-app flow runs locally) | The three-app UI flow in GitHub CI (optional) | Owner (repo secret) |
+| ~~B9~~ | ✅ Resolved 2026-10-21: the app repos are public, so the nightly E2E checks out the driver and restaurant apps without a token. Was: cross-app UI flows skipped on GitHub until the customer repo has `CLIENT_APPS_READ_TOKEN`. **No longer blocks #13** (closed: the backend Integration job and per-app Maestro smoke cover CI; the three-app flow runs locally) | The three-app UI flow in GitHub CI (optional) | Owner (repo secret) |
 | B6 | Android/iOS E2E not set up (needs a development build + emulator; no Android SDK on this machine) | Native UI regression coverage | Platform |
 | ~~B1~~ | ~~No restaurant client~~: **resolved** (#100, restaurant #6, #7) | — | — |
 | ~~B2~~ | ~~No driver client / no driver locations~~: **resolved** (#99 steps 1–6, driver repo #15, #16) | — | — |
@@ -324,7 +324,7 @@ flowchart LR
 | Phase 2 · Kafka reliability | Core merged (#103); #98 outbox done (#126, #127) | #23 event schema registry | Order and delivery events are published if and only if the DB change commits; payload contracts are versioned |
 | Phase 3 · Automatic dispatch + driver contracts | ✅ complete (#107–#110) | — (#33, #95, #96, #97 closed; milestone 0 open) | Orders reach a driver with no manual API call; the driver can find their job by API |
 | Phase 4 · Driver + restaurant clients | ✅ complete (milestone closed) | — (#99, #100 closed) | Met: both apps ship with `testID`s, a Maestro suite and CI from the first commit |
-| Phase 5 · Full business flow E2E | ✅ complete (milestone closed 2026-10-12) | — (#13 closed) | Met: the API critical path runs in the backend Integration job; each app runs Maestro smoke in CI; the three real UIs run the business flow locally (on GitHub too once `CLIENT_APPS_READ_TOKEN` exists) |
+| Phase 5 · Full business flow E2E | ✅ complete (milestone closed 2026-10-12) | — (#13 closed) | Met: the API critical path runs in the backend Integration job; each app runs Maestro smoke in CI; the three real UIs run the business flow locally (and on GitHub in the nightly run) |
 | Phase 6 · Notifications + push | 🟡 in-app complete (#5 via #129; cancellations #154; localized #189) | #50, #51 | A notification for every customer-visible stage (met); push on mobile with retries; preferences |
 | Phase 7 · Real-time tracking | ✅ complete (#32, #132, #134, #46, #60) | — | Met: moving driver pin from real locations over SSE with polling fallback; nothing after delivery; assignment/ETA contracts; untrusted locations bound to the delivery |
 | Product sprint · Business & UX | ✅ complete (milestone closed 2026-10-11) | — (#140–#155 closed) | Met: §5 |
@@ -378,7 +378,7 @@ flowchart LR
 | **CI** | All three apps: `ci.yml` (typecheck, lint, vitest, `kit:check -- --remote`, every push/PR) + `e2e.yml` (PR: smoke; nightly/manual: all). Starts the backend E2E stack from `BACKEND_REF`, seeds, runs headless. Smoke green on GitHub in all three repos. The backend's Integration job runs the API critical path (`npm run e2e`) |
 | **Locale** | E2E builds and vitest pin `EXPO_PUBLIC_DEFAULT_LOCALE=en`; each app's Arabic flow switches language in the UI and back |
 | **Failure artifacts** | JUnit per flow, screenshots and debug output per flow (`e2e/.artifacts`), backend compose logs on failure. Uploaded 14 days |
-| **Known limits** | Maestro web cannot scroll react-native-web lists (it scrolls the window; RN-Web keeps `body` overflow hidden), so headless runs use a 430×1600 viewport. Cross-app flows are skipped on GitHub until `CLIENT_APPS_READ_TOKEN` exists. Checkout decline can't be triggered from the UI (no payment input); covered via seeded S2 |
+| **Known limits** | Maestro web cannot scroll react-native-web lists (it scrolls the window; RN-Web keeps `body` overflow hidden), so headless runs use a 430×1600 viewport. Cross-app flows run on GitHub in the nightly and manual runs, not on PRs (smoke only). Checkout decline can't be triggered from the UI (no payment input); covered via seeded S2 |
 | **Runtime** | ~7.7 min for the original 9 flows locally (login dominates); not re-measured for the current 13 |
 
 **Rule for new work:** every client gets `testID`s, a Maestro suite and CI from its first commit. Every critical business flow gets E2E coverage before it is called done.
@@ -481,7 +481,7 @@ Every row was checked in the code. F1, F2 and F10 are fixed (struck through belo
 | Security | CodeQL, `npm audit`, Trivy; authz hardening + tests; self-registered admin fixed (F1, #105); phone codes HMAC-hashed, rate-limited, test sender refused in production (#153) | Moderate `@nestjs/core` advisory until NestJS 12 (#101); no DAST; no audit log |
 | Least privilege | Prod overlay requires every secret and publishes no infrastructure ports | Services use the `postgres` superuser; container runs as root; `kafka-ui:latest` unpinned (F4, #14) |
 | Rate limiting | Redis limiter on auth, orders, cart | No gateway-level limit |
-| E2E in CI | All three app repos run Maestro smoke on PRs against the backend `dev` E2E stack; the backend Integration job runs the API critical path | Three-app UI flow is local-only (B9); no branch protection to enforce checks (private free plan) |
+| E2E in CI | All three app repos run Maestro smoke on PRs against the backend `dev` E2E stack; the backend Integration job runs the API critical path | Three-app UI flow runs nightly, not on PRs; no branch protection enforces checks yet |
 | SMS / payments | `SmsSender` port (disabled by default); simulated payments | No SMS provider (B12); no payment gateway, refunds (B10) or payouts |
 | Analytics | — | No event warehouse |
 
