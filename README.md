@@ -18,7 +18,7 @@
   <a href="https://github.com/Delivery-Plus0/delivery-plus-customer-app"><img src="https://img.shields.io/badge/GitHub-Customer%20App-181717?logo=github&logoColor=white" alt="Customer app on GitHub"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.86-20232A?logo=react&logoColor=61DAFB" alt="React Native 0.86">
   <img src="https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Android%20%7C%20iOS%20%7C%20Web-ready-2E7D32" alt="Android, iOS and web">
+  <img src="https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20Web-2E7D32" alt="Platforms: Android, iOS and web">
 </p>
 
 Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs on Android, iOS and the web. The app talks only to the Delivery Plus API gateway. The backend (12 NestJS services, PostgreSQL, Redis, Kafka) lives in [Delivery-Plus0/delivery-plus](https://github.com/Delivery-Plus0/delivery-plus).
