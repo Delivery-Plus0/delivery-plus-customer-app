@@ -1,0 +1,27 @@
+url: ${APP_URL}
+name: Customer signs out, and a reload stays signed out
+tags:
+  - session
+---
+- runFlow: ../_shared/login.yaml
+- tapOn:
+    id: tab-profile
+- tapOn:
+    id: profile-sign-out
+- tapOn:
+    id: sign-out-dialog-confirm
+- extendedWaitUntil:
+    visible:
+      id: welcome-sign-in
+    timeout: 20000
+# Signing out isn't an ended session: no "You have been signed out" screen.
+- assertNotVisible:
+    id: session-ended
+# Both tokens are gone from this browser: a signed-in page sends the person back to the welcome screen.
+- openLink: ${APP_URL}/orders
+- extendedWaitUntil:
+    visible:
+      id: welcome-sign-in
+    timeout: 20000
+- assertNotVisible:
+    id: tab-orders

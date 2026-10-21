@@ -11,12 +11,12 @@ import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
-import { cartItemCount, emptyCart, setCartQuantity, useCart } from '@/state/cart';
+import { cartItemCount, describeCartError, emptyCart, setCartQuantity, useCart } from '@/state/cart';
 import { MAX_ITEM_QUANTITY } from '@/services/cart';
 import { useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { formatMoney } from '@/utils/format';
-import { t } from '@/i18n';
+import { t, tn } from '@/i18n';
 
 export default function CartScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -30,7 +30,7 @@ export default function CartScreen() {
   const changeQuantity = (menuItemId: string, quantity: number) => {
     setActionError(null);
     setCartQuantity(menuItemId, quantity).catch((error: unknown) =>
-      setActionError(error instanceof Error ? error.message : t('Could not update your cart.')),
+      setActionError(describeCartError(error, t('Could not update your cart.'))),
     );
   };
 
@@ -102,7 +102,7 @@ export default function CartScreen() {
         <View style={styles.footer}>
           <View style={styles.totalRow}>
             <ThemedText type="default" themeColor="textSecondary">
-              {count === 1 ? t('Subtotal · 1 item') : t('Subtotal · {count} items', { count })}
+              {tn(count, 'Subtotal · {count} item', 'Subtotal · {count} items')}
             </ThemedText>
             <ThemedText type="heading" testID="cart-subtotal">
               {formatMoney(cart.data.total)}

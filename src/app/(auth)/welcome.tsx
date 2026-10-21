@@ -50,8 +50,8 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          <AppButton title={t('Get started')} onPress={() => router.push('/register')} />
-          <AppButton title={t('I already have an account')} variant="secondary" onPress={() => router.push('/login')} />
+          <AppButton testID="welcome-get-started" title={t('Get started')} onPress={() => router.push('/register')} />
+          <AppButton testID="welcome-sign-in" title={t('I already have an account')} variant="secondary" onPress={() => router.push('/login')} />
         </View>
       </View>
     </Screen>

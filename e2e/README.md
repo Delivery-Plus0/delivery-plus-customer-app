@@ -36,6 +36,13 @@ the business flow).
 It always exports with `--clear`: a warm Metro cache can keep a previously inlined
 `EXPO_PUBLIC_API_BASE_URL` and silently point the build at the dev gateway.
 
+**Sessions (#34).** The `session` suite stays signed in for six minutes of 60-second access tokens, then signs out. It needs a stack started with short tokens, and refuses to run otherwise:
+
+```bash
+JWT_EXPIRES_IN=60s npm run e2e:env:up   # in ../delivery-plus (or restart only auth-service with it)
+npm run e2e:session -- --headless
+```
+
 Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volumes).
 
 ## Suites
@@ -44,6 +51,7 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 | --- | --- | --- |
 | `smoke` | login → Home · search → restaurant → menu · add → change quantity → total · cart → checkout → order | every PR |
 | `regression` | **cross-app:** the driver goes offline in the driver app, a ready order waits ("Finding a driver"), the driver goes online in the driver app and the customer sees "Driver assigned" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session | nightly / manual |
+| `session` | **60-second access tokens:** signed in for six minutes, reloading screens that need the API after every token expiry (five refreshes) · sign out → welcome screen, and a reload stays signed out | every PR and nightly, after the main suite, with auth-service restarted at `JWT_EXPIRES_IN=60s` |
 | `business` | **three apps, no API stand-ins**: customer orders in the customer app → the order appears on the **restaurant app**'s kitchen board → *Start preparing* → *Ready for pickup* in the restaurant app → automatic dispatch waits until the driver goes online **in the driver app** → driver app shows the job (pickup, drop-off, items) and shares its location → customer sees "Driver assigned" and the location is in the customer's tracking view → driver app: picked up, start, delivered, each seen in the customer app → Delivered → integrity check (one delivery, no new dead letters) → confirmation notification | nightly / manual |
 
 ## Test data (from `npm run seed:e2e`)

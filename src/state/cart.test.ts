@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/services/api';
 import { fetchCart, removeCartItem, updateCartItem, type Cart } from '@/services/cart';
 
-import { CART_KEY, isCartRestaurantConflict, setCartQuantity } from './cart';
+import { CART_KEY, describeCartError, isCartRestaurantConflict, isCartWriteConflict, setCartQuantity } from './cart';
 import { getResource, resetResourceCache, setResourceData } from './resource-cache';
 
 vi.mock('@/hooks/use-resource', () => ({ useResource: vi.fn() }));
@@ -70,5 +70,19 @@ describe('cart state', () => {
   it('recognizes the cross-restaurant conflict from cart-service', () => {
     expect(isCartRestaurantConflict(new ApiError(409, 'Conflict', 'x'))).toBe(true);
     expect(isCartRestaurantConflict(new ApiError(400, 'Bad Request', 'x'))).toBe(false);
+  });
+
+  it('never offers a new cart for a concurrent-write 409 (#205): it asks to try again', () => {
+    const raced = new ApiError(409, 'CartWriteConflict', 'Your cart changed at the same time. Please try again.');
+
+    expect(isCartRestaurantConflict(raced)).toBe(false);
+    expect(isCartRestaurantConflict(new ApiError(409, 'CartChanged', 'x'))).toBe(false);
+    expect(isCartWriteConflict(raced)).toBe(true);
+    expect(describeCartError(raced, 'fallback')).toBe('Your cart was changing at the same time. Please try again.');
+  });
+
+  it('describes other cart failures with the server message, or the fallback', () => {
+    expect(describeCartError(new ApiError(400, 'BadRequest', 'Item is not in the cart'), 'fallback')).toBe('Item is not in the cart');
+    expect(describeCartError('boom', 'fallback')).toBe('fallback');
   });
 });
