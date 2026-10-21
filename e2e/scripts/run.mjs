@@ -72,8 +72,13 @@ const SUITES = {
     'regression/offline-recovery.yaml',
   ],
   business: ['business/customer-order-lifecycle.yaml'],
+  // #34: needs the stack's access tokens at 60 s (JWT_EXPIRES_IN=60s), so it is not part of `all`.
+  session: ['session/stay-signed-in.yaml', 'session/sign-out.yaml'],
 };
 SUITES.all = [...SUITES.smoke, ...SUITES.regression, ...SUITES.business];
+
+/** The session suite proves refreshes only with short tokens; refuse a stack that issues long ones. */
+const SESSION_MAX_TOKEN_SECONDS = 90;
 
 if (!SUITES[suite]) {
   console.error(`Unknown suite "${suite}". Use one of: ${Object.keys(SUITES).join(', ')}`);
@@ -119,6 +124,21 @@ async function api(method, path, token, body) {
 async function login(email) {
   resetRateLimits();
   return (await api('POST', '/api/auth/login', null, { email, password: manifest.password })).accessToken;
+}
+
+/** Fails the session suite unless the stack's access tokens expire within SESSION_MAX_TOKEN_SECONDS. */
+async function requireShortAccessTokens() {
+  resetRateLimits();
+  const auth = await api('POST', '/api/auth/login', null, { email: manifest.accounts.customer.email, password: manifest.password });
+  const seconds = Math.round((Date.parse(auth.accessTokenExpiresAt) - Date.now()) / 1000);
+  if (!auth.refreshToken || !(seconds <= SESSION_MAX_TOKEN_SECONDS)) {
+    throw new Error(
+      `The session suite needs refresh tokens and access tokens of ${SESSION_MAX_TOKEN_SECONDS} s or less (this stack: ${Number.isFinite(seconds) ? `${seconds} s` : 'unknown'}). ` +
+        'Start the backend with `JWT_EXPIRES_IN=60s npm run e2e:env:up` (delivery-plus#244).',
+    );
+  }
+  await api('POST', '/api/auth/logout', null, { refreshToken: auth.refreshToken }).catch(() => undefined);
+  console.log(`Session suite: access tokens last ${seconds} s.`);
 }
 
 // The order the current flow is about (set by order/placed or a scenario).
@@ -468,6 +488,8 @@ async function main() {
   const restaurantWeb = withRestaurant ? serve(RESTAURANT_WEB_BUILD, RESTAURANT_WEB_PORT) : null;
   await new Promise((r) => control.listen(CONTROL_PORT, '127.0.0.1', r));
   await new Promise((r) => setTimeout(r, 500));
+
+  if (suite === 'session') await requireShortAccessTokens();
 
   // Fixture: start from the seed's driver state, and remember the dead-letter counts to compare.
   if (crossApp) await restoreSeedDriverState();

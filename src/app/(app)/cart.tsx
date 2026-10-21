@@ -11,7 +11,7 @@ import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, Spacing } from '@/constants/theme';
-import { cartItemCount, emptyCart, setCartQuantity, useCart } from '@/state/cart';
+import { cartItemCount, describeCartError, emptyCart, setCartQuantity, useCart } from '@/state/cart';
 import { MAX_ITEM_QUANTITY } from '@/services/cart';
 import { useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -30,7 +30,7 @@ export default function CartScreen() {
   const changeQuantity = (menuItemId: string, quantity: number) => {
     setActionError(null);
     setCartQuantity(menuItemId, quantity).catch((error: unknown) =>
-      setActionError(error instanceof Error ? error.message : t('Could not update your cart.')),
+      setActionError(describeCartError(error, t('Could not update your cart.'))),
     );
   };
 

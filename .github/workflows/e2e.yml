@@ -5,6 +5,8 @@ name: E2E (Maestro)
 #   app → Maestro (headless Chromium) → artifacts.
 #
 # - Pull requests run the smoke suite (critical customer path, ~4 min of flows).
+# - Every run then restarts auth-service with 60-second access tokens and runs the session suite
+#   (#34): six minutes signed in across five refreshes, and sign-out.
 # - A nightly schedule and manual runs execute everything: smoke + regression (failure paths,
 #   authorization, offline recovery) + the business cycle across the customer, restaurant and driver
 #   apps.
@@ -126,9 +128,24 @@ jobs:
           (cd restaurant-app && npm ci --no-audit --no-fund)
 
       - name: Run Maestro suite (customer app + restaurant app + driver app)
+        id: suite
         run: node e2e/scripts/run.mjs --suite "$SUITE" --build --headless
         env:
           E2E_SKIP_CROSS_APP: ${{ env.HAS_CLIENT_APPS_TOKEN == 'true' && '0' || '1' }}
+
+      # #34: the session suite needs short access tokens. Only auth-service changes; the data stays.
+      - name: Restart auth-service with 60-second access tokens
+        # Also after a failed main suite (its web build is reused), but not when the stack never started.
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        working-directory: backend
+        env:
+          JWT_EXPIRES_IN: 60s
+        run: docker compose -p delivery-plus-e2e -f docker-compose.base.yml -f docker-compose.test.yml -f docker-compose.e2e.yml up -d --no-deps --wait --wait-timeout 180 auth-service
+
+      - name: Run Maestro session suite (60-second access tokens)
+        # Also after a failed main suite (its web build is reused), but not when the stack never started.
+        if: ${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}
+        run: node e2e/scripts/run.mjs --suite session --headless
 
       - name: Collect backend logs
         if: failure()

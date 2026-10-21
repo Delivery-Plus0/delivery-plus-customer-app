@@ -24,6 +24,7 @@ export default function RegisterScreen() {
   const [touched, setTouched] = useState<Record<Field, boolean>>({ fullName: false, email: false, phone: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const emailRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
@@ -48,6 +49,7 @@ export default function RegisterScreen() {
     if (Object.values(errors).some(Boolean) || isSubmitting) return;
 
     setError(null);
+    setNotice(null);
     setIsSubmitting(true);
     try {
       const auth = await registerAccount({
@@ -58,7 +60,12 @@ export default function RegisterScreen() {
         phone: normalizeEgyptianMobile(phone) ?? undefined,
         role: 'CUSTOMER',
       });
-      await setSession(auth.accessToken);
+      if ('verificationRequired' in auth) {
+        // #203: the account exists, but signing in waits for the emailed code.
+        setNotice(t('Your account is ready. Check your email for a verification code, then sign in.'));
+        return;
+      }
+      await setSession(auth.accessToken, auth.refreshToken);
       router.replace('/home');
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : t('Unable to create your account right now.'));
@@ -149,6 +156,11 @@ export default function RegisterScreen() {
       {error ? (
         <View style={styles.alert}>
           <InlineAlert message={error} />
+        </View>
+      ) : null}
+      {notice ? (
+        <View style={styles.alert}>
+          <InlineAlert message={notice} tone="info" testID="register-notice" />
         </View>
       ) : null}
 
