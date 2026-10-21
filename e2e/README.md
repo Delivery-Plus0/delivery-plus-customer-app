@@ -116,11 +116,10 @@ Redis only, so repeated sign-ins don't hit the 5/min login limit.
 
 ### CI
 
-The driver and restaurant apps are private repos, which `GITHUB_TOKEN` can't read. The workflow
-checks them out with the secret `CLIENT_APPS_READ_TOKEN` (fine-grained, Contents: read on
-`delivery-plus-driver-app` and `delivery-plus-restaurant-app`).
-Without the secret, the cross-app flows are **skipped with a warning** (`E2E_SKIP_CROSS_APP=1`); PR
-smoke doesn't need it.
+The driver and restaurant apps are public repos, so the workflow checks them out (`dev`, or
+`DRIVER_APP_REF` / `RESTAURANT_APP_REF`) without a token for every suite except smoke. PRs run
+smoke only; the nightly and manual runs include the cross-app flows. `E2E_SKIP_CROSS_APP=1` still
+skips them on a machine without the other apps.
 
 ## Selectors
 
