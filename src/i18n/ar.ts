@@ -193,7 +193,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   Phone: 'الموبايل',
   'Add a phone number': 'أضف رقم موبايل',
   Verified: 'تم التحقق',
-  Verify: 'تحقق',
   'Delivery address': 'عنوان التوصيل',
   'Add your address': 'أضف عنوانك',
   'Signed in as a customer': 'مسجّل الدخول كعميل',
@@ -221,9 +220,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   "We'll text a 6-digit code to {phone}.": 'سنرسل كودًا من 6 أرقام في رسالة إلى {phone}.',
   'Send code': 'إرسال الكود',
   'Enter the code we sent to {phone}. It expires in 5 minutes.': 'أدخل الكود الذي أرسلناه إلى {phone}. صالح لمدة 5 دقائق.',
-  Code: 'الكود',
-  'Resend code in {seconds} s': 'إعادة الإرسال بعد {seconds} ث',
-  'Resend code': 'إعادة إرسال الكود',
 
   // Cart
   'Could not update your cart.': 'تعذّر تحديث السلة.',
@@ -288,7 +284,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   Password: 'كلمة المرور',
   'Your password': 'كلمة المرور',
   'Your cart was changing at the same time. Please try again.': 'كانت سلتك تتغير في الوقت نفسه. حاول مرة أخرى.',
-  'Your account is ready. Check your email for a verification code, then sign in.': 'حسابك جاهز. تحقق من بريدك الإلكتروني للحصول على رمز التحقق، ثم سجّل الدخول.',
   'Password must be at least 8 characters': 'يجب ألا تقل كلمة المرور عن 8 أحرف',
   'Unable to create your account right now.': 'تعذّر إنشاء حسابك الآن.',
   'Create account': 'إنشاء الحساب',
