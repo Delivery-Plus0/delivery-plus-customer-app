@@ -10,8 +10,8 @@
 //      DRIVER_APP_DIR (../delivery-plus-driver-app; the driver app for the cross-app flows),
 //      E2E_DRIVER_WEB_PORT (8084), RESTAURANT_APP_DIR (../delivery-plus-restaurant-app; the
 //      restaurant app for the business flow), E2E_RESTAURANT_WEB_PORT (8085),
-//      E2E_SKIP_CROSS_APP (1 = skip cross-app flows, e.g. CI without
-//      access to the driver repo)
+//      E2E_SKIP_CROSS_APP (1 = skip cross-app flows, e.g. on a machine
+//      without the driver and restaurant apps)
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
