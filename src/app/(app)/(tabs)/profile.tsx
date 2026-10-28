@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 
+import { ChangePasswordSheet } from '@/components/change-password-sheet';
 import { PhoneVerificationSheet } from '@/components/phone-verification-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [verifySheet, setVerifySheet] = useState(false);
+  const [passwordSheet, setPasswordSheet] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const signOut = async () => {
@@ -171,6 +173,15 @@ export default function ProfileScreen() {
               <ThemedText type="caption" themeColor="textSecondary" style={styles.meta}>
                 {session?.user.role === 'CUSTOMER' ? t('Signed in as a customer') : t('Signed in as {role}', { role: session?.user.role ?? '' })}
               </ThemedText>
+              <AppButton
+                testID="profile-change-password"
+                title={t('Change password')}
+                variant="secondary"
+                onPress={() => {
+                  setNotice(null);
+                  setPasswordSheet(true);
+                }}
+              />
               <AppButton testID="profile-sign-out" title={t('Sign out')} icon="logout" variant="danger" onPress={() => void signOut()} />
             </>
           ) : null}
@@ -183,6 +194,15 @@ export default function ProfileScreen() {
           onVerified={() => {
             setVerifySheet(false);
             setNotice(t('Phone verified.'));
+          }}
+        />
+      ) : null}
+      {passwordSheet ? (
+        <ChangePasswordSheet
+          onClose={() => setPasswordSheet(false)}
+          onChanged={() => {
+            setPasswordSheet(false);
+            setNotice(t('Password changed. Your other devices were signed out.'));
           }}
         />
       ) : null}
