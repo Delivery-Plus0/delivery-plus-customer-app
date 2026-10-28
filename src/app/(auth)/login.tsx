@@ -13,16 +13,25 @@ import { loginAccount } from '@/services/auth';
 import { setSession } from '@/services/session';
 import { isEmailNotVerified, startEmailVerification, takeVerifiedEmail } from '@/utils/email-verification';
 import { describeLoginError } from '@/utils/login-errors';
+import { takePasswordResetNotice } from '@/utils/password';
 import { t } from '@/i18n';
 
 export default function LoginScreen() {
   // Coming back from the code screen: the email is filled in and the person is told it worked.
   const [verifiedEmail] = useState(takeVerifiedEmail);
+  // Coming back from a password reset (#35): every session ended, so the person signs in again.
+  const [passwordReset] = useState(takePasswordResetNotice);
   const [email, setEmail] = useState(verifiedEmail ?? '');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState({ email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
-  const [notice, setNotice] = useState<string | null>(verifiedEmail ? t('Email verified. Sign in to continue.') : null);
+  const [notice, setNotice] = useState<string | null>(
+    verifiedEmail
+      ? t('Email verified. Sign in to continue.')
+      : passwordReset
+        ? t('Password changed. Sign in with your new password.')
+        : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failures, setFailures] = useState(0);
@@ -122,6 +131,13 @@ export default function LoginScreen() {
         returnKeyType="go"
         onSubmitEditing={() => void handleSubmit()}
       />
+      <View style={styles.forgot}>
+        <Link href="/forgot-password" replace asChild>
+          <Pressable accessibilityRole="link" hitSlop={8} testID="login-forgot" nativeID="login-forgot">
+            <ThemedText type="linkPrimary">{t('Forgot password?')}</ThemedText>
+          </Pressable>
+        </Link>
+      </View>
 
       {notice ? (
         <View style={styles.alert}>
@@ -147,6 +163,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  forgot: {
+    alignItems: 'flex-end',
+    marginBottom: Spacing.three,
+  },
   alert: {
     marginBottom: Spacing.three,
   },

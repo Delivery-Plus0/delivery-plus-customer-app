@@ -65,6 +65,8 @@ const SUITES = {
     'regression/order-awaiting-driver.yaml',
     'regression/profile-photo.yaml',
     'regression/phone-verification.yaml',
+    'regression/change-password.yaml',
+    'regression/forgot-password.yaml',
     'regression/order-payment-failed.yaml',
     'regression/order-cancel.yaml',
     'regression/arabic.yaml',
@@ -77,6 +79,8 @@ const SUITES = {
   // #66: needs EMAIL_VERIFICATION_REQUIRED=true on auth-service (backend #252), so it is not part of `all`.
   verification: ['verification/sign-up.yaml', 'verification/unverified-sign-in.yaml'],
 };
+// #52: the two password flows on their own (they are in regression too); they need no seed data.
+SUITES.password = ['regression/change-password.yaml', 'regression/forgot-password.yaml'];
 SUITES.all = [...SUITES.smoke, ...SUITES.regression, ...SUITES.business];
 
 /** The session suite proves refreshes only with short tokens; refuse a stack that issues long ones. */
@@ -322,6 +326,37 @@ const actions = {
   'verification/read-email-code': async () => {
     state.code = readEmailCode(state.newEmail);
     state.wrongCode = state.code === '000000' ? '111111' : '000000';
+  },
+  // Password flows (#52, backend #35): a fresh customer whose phone is verified (straight in
+  // user-service's table, test stack only), so the flows never change the QA customer's password.
+  'password/new-account': async () => {
+    resetRateLimits();
+    const stamp = Date.now();
+    state.newEmail = `e2e.password.${stamp}@example.com`;
+    state.newPhone = `010${String(stamp).slice(-8)}`; // as a person types it
+    state.newPassword = 'E2e-New-Passw0rd!';
+    const auth = await api('POST', '/api/auth/register', null, { email: state.newEmail, password: manifest.password, fullName: 'E2E Password', phone: state.newPhone });
+    if (!auth?.accessToken) throw new Error('Registering did not sign in: the password flows need EMAIL_VERIFICATION_REQUIRED off');
+    const me = await api('GET', '/api/users/me', auth.accessToken);
+    if (!/^[0-9a-f-]{36}$/i.test(me.id) || me.phone !== `+20${state.newPhone.slice(1)}`) throw new Error(`Unexpected profile ${me.id} ${me.phone}`);
+    docker('exec', container('postgres'), 'psql', '-U', 'postgres', '-d', 'user_service', '-c', `update user_profiles set "phoneVerifiedAt" = now() where id = '${me.id}'`);
+    await api('POST', '/api/auth/logout', null, { refreshToken: auth.refreshToken }).catch(() => undefined);
+  },
+  // The reset code the test SMS sender (SMS_PROVIDER=test) kept for that phone, and a wrong one. It is
+  // texted after the answer (user-service sends in the background), so wait for it briefly.
+  'password/read-reset-code': async () => {
+    const phone = `+20${state.newPhone.slice(1)}`;
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const code = /(\d{6})/.exec(docker('exec', container('redis'), 'redis-cli', 'GET', `test:sms:${phone}`).trim())?.[1];
+      if (code) {
+        state.code = code;
+        state.wrongCode = code === '000000' ? '111111' : '000000';
+        return;
+      }
+      if (Date.now() > deadline) throw new Error(`No reset code was texted to ${phone}`);
+      await new Promise((r) => setTimeout(r, 250));
+    }
   },
   'profile/clear-avatar': async () => {
     const customer = await login(manifest.accounts.customer.email);

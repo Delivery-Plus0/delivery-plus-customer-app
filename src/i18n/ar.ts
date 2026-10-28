@@ -190,7 +190,6 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Profile updated.': 'تم تحديث الحساب.',
   'Full name': 'الاسم بالكامل',
   Email: 'البريد الإلكتروني',
-  Phone: 'الموبايل',
   'Add a phone number': 'أضف رقم موبايل',
   Verified: 'تم التحقق',
   'Delivery address': 'عنوان التوصيل',
@@ -216,9 +215,7 @@ export const appArabic: Readonly<Record<string, string>> = {
   // Phone verification (#153)
   'Verify your phone': 'تحقق من رقم موبايلك',
   'Add your phone number': 'أضف رقم موبايلك',
-  'Enter the 6 digits from the text message.': 'أدخل الأرقام الستة من الرسالة.',
   "We'll text a 6-digit code to {phone}.": 'سنرسل كودًا من 6 أرقام في رسالة إلى {phone}.',
-  'Send code': 'إرسال الكود',
   'Enter the code we sent to {phone}. It expires in 5 minutes.': 'أدخل الكود الذي أرسلناه إلى {phone}. صالح لمدة 5 دقائق.',
 
   // Cart
