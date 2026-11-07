@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
+import { BrandColors, FontFamily, IconSize, Radius, Spacing } from '@/constants/theme';
 import { t } from '@/i18n';
 
 type QuantityStepperProps = {
@@ -76,6 +76,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: FontFamily.bold,
     color: BrandColors.text,
   },
 });

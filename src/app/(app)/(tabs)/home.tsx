@@ -10,7 +10,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
-import { BrandColors, IconSize, Layout, Radius, Spacing } from '@/constants/theme';
+import { BrandColors, FontFamily, IconSize, Layout, Radius, Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import type { Restaurant, RestaurantStatus } from '@/services/restaurants';
 import { useAuthSession } from '@/services/session';
@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 16,
+    fontFamily: FontFamily.regular,
     color: BrandColors.text,
   },
   filters: {
