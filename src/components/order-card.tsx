@@ -5,7 +5,8 @@ import { StyleSheet, View } from 'react-native';
 import { OrderStatusBadge } from '@/components/order-status';
 import { ThemedText } from '@/components/themed-text';
 import { Card } from '@/components/ui/card';
-import { Spacing } from '@/constants/theme';
+import { Icon } from '@/components/ui/icon';
+import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { Order } from '@/services/orders';
 import { useRestaurant } from '@/state/catalog';
 import { formatDateTime, formatMoney, shortId } from '@/utils/format';
@@ -28,7 +29,11 @@ export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
       onPress={() => router.push({ pathname: '/order/[id]', params: { id: order.id } })}
       accessibilityLabel={t('Order from {name}, {total}', { name: restaurantName, total: formatMoney(order.totalAmount) })}
     >
+      {/* Figma C-25: store tile, name and meta, status; a divider; items and total. */}
       <View style={styles.topRow}>
+        <View style={styles.tile}>
+          <Icon name="store" size={IconSize.md} color={BrandColors.primary} />
+        </View>
         <View style={styles.flex}>
           <ThemedText type="defaultBold" numberOfLines={1}>
             {restaurantName}
@@ -39,11 +44,12 @@ export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
         </View>
         <OrderStatusBadge status={order.status} />
       </View>
+      <View style={styles.divider} />
       <View style={styles.bottomRow}>
         <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.flex}>
           {summarizeItems(order)}
         </ThemedText>
-        <ThemedText type="smallBold">{formatMoney(order.totalAmount)}</ThemedText>
+        <ThemedText type="defaultBold">{formatMoney(order.totalAmount)}</ThemedText>
       </View>
     </Card>
   );
@@ -56,7 +62,20 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.two,
+    gap: Spacing.three,
+  },
+  tile: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
+    backgroundColor: BrandColors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: BrandColors.border,
+    marginVertical: Spacing.one,
   },
   bottomRow: {
     flexDirection: 'row',

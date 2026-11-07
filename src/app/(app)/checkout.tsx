@@ -172,13 +172,39 @@ export default function CheckoutScreen() {
           </Card>
         ) : null}
 
+        {/* Figma C-15: the order goes to the profile address (order-service uses it when none is sent). */}
+        <Card style={styles.row} testID="checkout-deliver-to">
+          <View style={styles.iconWrap}>
+            <Icon name="location" size={IconSize.md} color={BrandColors.primary} />
+          </View>
+          <View style={styles.flex}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              {t('DELIVER TO')}
+            </ThemedText>
+            {profile.data?.address ? (
+              <>
+                <ThemedText type="defaultBold" numberOfLines={2}>
+                  {profile.data.address}
+                </ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {t('From your profile')}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('Add a delivery address in your profile.')}
+              </ThemedText>
+            )}
+          </View>
+        </Card>
+
         {items.length > 0 ? (
           <Card>
             <ThemedText type="heading">{t('Order summary')}</ThemedText>
             {items.map((item) => (
               <View key={item.menuItemId} style={styles.itemRow}>
                 <ThemedText type="small" style={styles.flex}>
-                  <ThemedText type="smallBold">{item.quantity}×</ThemedText> {item.name}
+                  <ThemedText type="smallBold" style={styles.quantity}>{item.quantity}×</ThemedText> {item.name}
                 </ThemedText>
                 <ThemedText type="small">{formatMoney(item.price * item.quantity)}</ThemedText>
               </View>
@@ -217,15 +243,15 @@ export default function CheckoutScreen() {
               />
             ) : (
               <ThemedText type="small" themeColor="textSecondary" testID="checkout-quote-loading">
-                Working out the delivery fee…
+                {t('Working out the delivery fee…')}
               </ThemedText>
             )}
           </Card>
         ) : null}
 
         <Card style={styles.row}>
-          <View style={styles.iconWrap}>
-            <Icon name="check" size={IconSize.md} color={BrandColors.primaryText} />
+          <View style={[styles.iconWrap, styles.iconWrapSuccess]}>
+            <Icon name="shield" size={IconSize.md} color={BrandColors.success} />
           </View>
           <View style={styles.flex}>
             <ThemedText type="defaultBold">{t('Payment')}</ThemedText>
@@ -252,7 +278,7 @@ export default function CheckoutScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.four - Spacing.one,
     paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
@@ -265,12 +291,18 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
     backgroundColor: BrandColors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconWrapSuccess: {
+    backgroundColor: BrandColors.successSoft,
+  },
+  quantity: {
+    color: BrandColors.primaryText,
   },
   itemRow: {
     flexDirection: 'row',

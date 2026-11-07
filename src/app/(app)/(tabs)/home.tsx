@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 
 import { CartBar } from '@/components/cart-bar';
+import { FilterChip } from '@/components/filter-chip';
 import { RestaurantCard } from '@/components/restaurant-card';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -98,19 +99,13 @@ export default function HomeScreen() {
           {FILTERS.map((option) => {
             const selected = option.id === filter.id;
             return (
-              <Pressable
-                testID={`filter-${option.id}`}
-                nativeID={`filter-${option.id}`}
+              <FilterChip
                 key={option.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
+                testID={`filter-${option.id}`}
+                label={filterLabel(option)}
+                selected={selected}
                 onPress={() => setFilter(option)}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <ThemedText type="smallBold" style={selected ? styles.chipTextSelected : styles.chipText}>
-                  {filterLabel(option)}
-                </ThemedText>
-              </Pressable>
+              />
             );
           })}
         </View>

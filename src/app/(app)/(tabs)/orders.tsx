@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 
+import { FilterChip } from '@/components/filter-chip';
 import { OrderCard } from '@/components/order-card';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
@@ -47,18 +48,14 @@ export default function OrdersScreen() {
         {ORDER_FILTER_OPTIONS.map((option) => {
           const selected = option.key === filter;
           return (
-            <Pressable
+            <FilterChip
               key={option.testID}
               testID={option.testID}
-              nativeID={option.testID}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              role="tab"
+              label={option.label}
+              selected={selected}
               onPress={() => setFilter(option.key)}
-              style={[styles.chip, selected && styles.chipSelected]}>
-              <ThemedText type="smallBold" style={selected ? styles.chipTextSelected : undefined}>
-                {option.label}
-              </ThemedText>
-            </Pressable>
+            />
           );
         })}
       </View>

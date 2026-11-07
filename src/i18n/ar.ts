@@ -2,6 +2,13 @@ import type { ArabicPluralForms } from './core';
 
 /** Arabic for this app's own text (#151): English text → Arabic. The kit's strings are in kit-ar.ts. */
 export const appArabic: Readonly<Record<string, string>> = {
+  // Redesign 2026
+  Add: 'أضف',
+  'Sold out': 'نفدت الكمية',
+  'Working out the delivery fee…': 'جارٍ حساب رسوم التوصيل…',
+  'DELIVER TO': 'التوصيل إلى',
+  'From your profile': 'من ملفك الشخصي',
+  'Add a delivery address in your profile.': 'أضف عنوان التوصيل في ملفك الشخصي.',
   // Tabs and navigation
   Home: 'الرئيسية',
   Orders: 'الطلبات',

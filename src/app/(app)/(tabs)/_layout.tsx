@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 
-import { Icon, type IconName } from '@/components/ui/icon';
+import { TabBarIcon, type IconName } from '@/components/ui/icon';
 import { BrandColors, TabBar } from '@/constants/theme';
 import { unreadCount, useNotifications } from '@/state/notifications';
 import { t } from '@/i18n';
@@ -9,8 +9,8 @@ import { t } from '@/i18n';
 const NOTIFICATION_POLL_MS = 60_000;
 
 function tabIcon(name: IconName) {
-  return function TabIcon({ color, size }: { color: ColorValue; size: number }) {
-    return <Icon name={name} color={color} size={size} />;
+  return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
+    return <TabBarIcon name={name} color={color} focused={focused} />;
   };
 }
 
