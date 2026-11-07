@@ -29,6 +29,7 @@ const filterLabel = (filter: Filter) => (filter.status ? t('Open now') : t('All'
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [filter, setFilter] = useState<Filter>(FILTERS[0]);
   const debouncedSearch = useDebouncedValue(search);
 
@@ -75,13 +76,15 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.searchWrap}>
-        <View style={styles.search}>
+        <View style={[styles.search, searchFocused && styles.searchFocused]}>
           <Icon name="search" size={IconSize.md} color={BrandColors.textMuted} />
           <TextInput
             testID="home-search"
             nativeID="home-search"
             value={search}
             onChangeText={setSearch}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder={t('Search restaurants')}
             placeholderTextColor={BrandColors.textMuted}
             accessibilityLabel={t('Search restaurants')}
@@ -202,8 +205,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BrandColors.border,
   },
+  searchFocused: {
+    borderWidth: 2,
+    borderColor: BrandColors.text,
+    paddingHorizontal: Spacing.three - 1,
+  },
   searchInput: {
     flex: 1,
+    outlineWidth: 0,
     height: '100%',
     fontSize: 16,
     fontFamily: FontFamily.regular,
