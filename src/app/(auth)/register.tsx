@@ -33,7 +33,7 @@ export default function RegisterScreen() {
   // Mirrors auth-service RegisterDto.
   const errors: Record<Field, string | undefined> = {
     fullName: fullName.trim() ? undefined : t('Full name is required'),
-    email: !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined,
+    email: !email.trim() ? t('Email is required') : !emailPattern.test(email.trim()) ? t('Enter a valid email') : undefined,
     phone: phoneError(phone),
     password: !password
       ? t('Password is required')

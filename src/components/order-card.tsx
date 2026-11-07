@@ -21,7 +21,7 @@ function summarizeItems(order: Order): string {
 
 export const OrderCard = memo(function OrderCard({ order }: { order: Order }) {
   const { data: restaurant } = useRestaurant(order.restaurantId);
-  const restaurantName = restaurant?.name ?? 'Restaurant';
+  const restaurantName = restaurant?.name ?? t('Restaurant');
 
   return (
     <Card

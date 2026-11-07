@@ -5,6 +5,9 @@ export const appArabic: Readonly<Record<string, string>> = {
   // Redesign 2026
   Add: 'أضف',
   'Sold out': 'نفدت الكمية',
+  Restaurant: 'مطعم',
+  'Email is required': 'البريد الإلكتروني مطلوب',
+  'Enter a valid email': 'أدخل بريدًا إلكترونيًا صحيحًا',
   'Working out the delivery fee…': 'جارٍ حساب رسوم التوصيل…',
   'DELIVER TO': 'التوصيل إلى',
   'From your profile': 'من ملفك الشخصي',
