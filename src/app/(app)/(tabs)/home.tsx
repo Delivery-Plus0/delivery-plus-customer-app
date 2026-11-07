@@ -118,6 +118,13 @@ export default function HomeScreen() {
           renderItem={({ item }) => <RestaurantCard restaurant={item} onPress={openRestaurant} />}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={Separator}
+          ListHeaderComponent={
+            isSearching && items.length > 0 ? (
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.count} testID="home-result-count">
+                {t('{count} restaurants', { count: restaurants.data?.total ?? items.length })}
+              </ThemedText>
+            ) : null
+          }
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           initialNumToRender={4}
@@ -133,7 +140,17 @@ export default function HomeScreen() {
           }
           ListEmptyComponent={
             <StateView
+              testID="home-empty"
               icon={isSearching ? 'search' : 'store'}
+              actionLabel={isSearching ? t('Clear search') : undefined}
+              onAction={
+                isSearching
+                  ? () => {
+                      setSearch('');
+                      setFilter(FILTERS[0]);
+                    }
+                  : undefined
+              }
               title={isSearching ? t('No matches') : t('No restaurants yet')}
               message={
                 isSearching
@@ -164,6 +181,9 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+  },
+  count: {
+    paddingBottom: Spacing.two,
   },
   searchWrap: {
     paddingHorizontal: Spacing.four,

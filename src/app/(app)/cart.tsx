@@ -37,6 +37,7 @@ export default function CartScreen() {
   const handleClear = async () => {
     const ok = await confirm({
       testID: 'clear-cart-dialog',
+      icon: 'trash',
       title: t('Clear cart?'),
       message: t('This removes every item from your cart.'),
       confirmLabel: t('Clear cart'),

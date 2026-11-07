@@ -131,7 +131,7 @@ export default function RegisterScreen() {
         testID="register-phone"
         ref={phoneRef}
         label={t('Phone')}
-        icon="phone"
+        prefix="+20"
         value={phone}
         onChangeText={setPhone}
         onBlur={markTouched('phone')}

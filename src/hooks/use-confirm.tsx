@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
 import { Dialog } from '@/components/ui/dialog';
+import type { IconName } from '@/components/ui/icon';
 
 export type ConfirmOptions = {
   title: string;
@@ -8,6 +9,8 @@ export type ConfirmOptions = {
   confirmLabel: string;
   cancelLabel?: string;
   destructive?: boolean;
+  /** Icon above the title; destructive dialogs default to the alert icon. */
+  icon?: IconName;
   /** Ids: `<testID>`, `<testID>-confirm`, `<testID>-cancel`. */
   testID?: string;
 };
@@ -44,6 +47,7 @@ export function useConfirm(): [ReactNode, (options: ConfirmOptions) => Promise<b
       confirmLabel={options.confirmLabel}
       cancelLabel={options.cancelLabel}
       destructive={options.destructive}
+      icon={options.icon}
       onConfirm={() => answer(true)}
       onCancel={() => answer(false)}
       testID={options.testID ?? 'confirm-dialog'}

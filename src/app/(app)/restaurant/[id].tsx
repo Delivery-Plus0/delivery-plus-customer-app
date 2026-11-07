@@ -49,6 +49,7 @@ export default function RestaurantScreen() {
       if (isCartRestaurantConflict(error)) {
         const startNew = await confirm({
           testID: 'new-cart-dialog',
+          icon: 'bag',
           title: t('Start a new cart?'),
           message: t('Your cart has items from another restaurant. Clear it and add {name}?', { name: item.name }),
           confirmLabel: t('Start new cart'),

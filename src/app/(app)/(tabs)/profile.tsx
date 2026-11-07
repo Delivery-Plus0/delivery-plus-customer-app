@@ -38,6 +38,7 @@ export default function ProfileScreen() {
   const signOut = async () => {
     const ok = await confirm({
       testID: 'sign-out-dialog',
+      icon: 'logout',
       title: t('Sign out?'),
       message: t('You will need to sign in again to place orders.'),
       confirmLabel: t('Sign out'),
@@ -362,6 +363,7 @@ function EditProfileForm({
       />
       <FormTextInput
         label={t('Phone')}
+        prefix="+20"
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"

@@ -6,12 +6,14 @@ import { PhoneVerificationSheet } from '@/components/phone-verification-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
+import { FormTextInput } from '@/components/ui/form-text-input';
 import { Icon } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
+import { ApiError } from '@/services/api';
 import { submitCheckout } from '@/services/checkout';
 import { isCartChanged } from '@/utils/cart-changes';
 import { reloadCart, useCart } from '@/state/cart';
@@ -42,6 +44,8 @@ export default function CheckoutScreen() {
   // #153: ordering can require a verified phone; the next step is offered right here.
   const [needsVerifiedPhone, setNeedsVerifiedPhone] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  // Instructions for the driver (gate code, floor…), sent as deliveryNotes with the order.
+  const [deliveryNotes, setDeliveryNotes] = useState('');
   const profile = useProfile();
   // Stable for this checkout attempt so a retry can never create a duplicate order or charge.
   const orderIdempotencyKey = useRef(createIdempotencyKey('order'));
@@ -53,7 +57,11 @@ export default function CheckoutScreen() {
       setErrorMessage(null);
       setFailedOrderId(null);
       setNeedsVerifiedPhone(false);
-      const { order, payment } = await submitCheckout(orderIdempotencyKey.current, paymentIdempotencyKey.current);
+      const { order, payment } = await submitCheckout(
+        orderIdempotencyKey.current,
+        paymentIdempotencyKey.current,
+        deliveryNotes.trim() ? { deliveryNotes } : undefined,
+      );
 
       // The order-service empties the cart once the order exists, whatever happens to payment.
       void reloadCart();
@@ -78,6 +86,11 @@ export default function CheckoutScreen() {
       if (isCartChanged(error)) {
         void reloadCart();
         setErrorMessage(t('Your cart changed: a price, an item or a quantity is different now. Check your order and place it again.'));
+        return;
+      }
+      // 409 OutOfDeliveryArea: the profile address is beyond this restaurant's delivery radius.
+      if (error instanceof ApiError && error.error === 'OutOfDeliveryArea') {
+        setErrorMessage(t('This restaurant does not deliver to your address. Change your address in your profile or pick a closer restaurant.'));
         return;
       }
       setNeedsVerifiedPhone(isPhoneNotVerified(error));
@@ -196,7 +209,25 @@ export default function CheckoutScreen() {
               </ThemedText>
             )}
           </View>
+          <AppButton
+            testID="checkout-change-address"
+            title={profile.data?.address ? t('Change') : t('Add')}
+            variant="ghost"
+            size="sm"
+            onPress={() => router.navigate('/profile')}
+          />
         </Card>
+
+        <FormTextInput
+          testID="checkout-delivery-notes"
+          label={t('Notes for the driver (optional)')}
+          placeholder={t('Gate code, floor, landmark…')}
+          icon="edit"
+          value={deliveryNotes}
+          onChangeText={setDeliveryNotes}
+          maxLength={500}
+          returnKeyType="done"
+        />
 
         {items.length > 0 ? (
           <Card>
