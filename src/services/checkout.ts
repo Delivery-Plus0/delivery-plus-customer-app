@@ -1,4 +1,4 @@
-import { createOrder, type Order } from '@/services/orders';
+import { createOrder, type CreateOrderDetails, type Order } from '@/services/orders';
 import { createPayment, processPayment, type Payment } from '@/services/payments';
 
 export type CheckoutResult = {
@@ -9,8 +9,9 @@ export type CheckoutResult = {
 export async function submitCheckout(
   orderIdempotencyKey: string,
   paymentIdempotencyKey: string,
+  details?: CreateOrderDetails,
 ): Promise<CheckoutResult> {
-  const order = await createOrder(orderIdempotencyKey);
+  const order = details ? await createOrder(orderIdempotencyKey, details) : await createOrder(orderIdempotencyKey);
   const pendingPayment = await createPayment(order.id, paymentIdempotencyKey);
   const payment = await processPayment(pendingPayment.id);
 

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { BrandColors, Elevation, IconSize, Radius, Spacing } from '@/constants/theme';
+import { BrandColors, FontFamily, Elevation, IconSize, Radius, Spacing } from '@/constants/theme';
 import { cartItemCount, useCart } from '@/state/cart';
 import { formatMoney } from '@/utils/format';
 import { t } from '@/i18n';
@@ -66,16 +66,19 @@ const styles = StyleSheet.create({
   countText: {
     color: BrandColors.onPrimary,
     fontWeight: '700',
+    fontFamily: FontFamily.bold,
   },
   label: {
     flex: 1,
     color: BrandColors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: FontFamily.bold,
   },
   total: {
     color: BrandColors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: FontFamily.bold,
   },
 });

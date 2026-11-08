@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
+import { BrandColors, FontFamily, IconSize, Radius, Spacing } from '@/constants/theme';
 import { t } from '@/i18n';
 
 type QuantityStepperProps = {
@@ -31,7 +31,7 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
       >
         <Icon name={quantity <= 1 ? 'trash' : 'minus'} size={IconSize.sm} color={BrandColors.primaryText} />
       </Pressable>
-      <Text style={styles.quantity} accessibilityLabel={`${quantity} in cart`} testID={testID && `${testID}-value`} nativeID={testID && `${testID}-value`}>
+      <Text style={styles.quantity} accessibilityLabel={t('{count} in cart', { count: quantity })} testID={testID && `${testID}-value`} nativeID={testID && `${testID}-value`}>
         {quantity}
       </Text>
       <Pressable
@@ -76,6 +76,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: FontFamily.bold,
     color: BrandColors.text,
   },
 });

@@ -76,17 +76,14 @@ export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress
       </View>
 
       <View style={styles.body}>
-        <View style={styles.logo}>
-          {restaurant.logoUrl ? (
+        {/* Figma C-05: the logo shows only when the restaurant uploaded one; no stand-in initial. */}
+        {restaurant.logoUrl ? (
+          <View style={styles.logo}>
             <Image source={restaurant.logoUrl} style={styles.logoImage} contentFit="cover" cachePolicy="memory-disk" />
-          ) : (
-            <ThemedText type="defaultBold" style={styles.logoInitial}>
-              {restaurant.name.charAt(0).toUpperCase()}
-            </ThemedText>
-          )}
-        </View>
+          </View>
+        ) : null}
         <View style={styles.info}>
-          <ThemedText type="heading" numberOfLines={1}>
+          <ThemedText type="defaultBold" numberOfLines={1} themeColor={unavailable ? 'textSecondary' : 'text'}>
             {restaurant.name}
           </ThemedText>
           {restaurant.description ? (
@@ -109,7 +106,7 @@ export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress
 const styles = StyleSheet.create({
   card: {
     backgroundColor: BrandColors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: BrandColors.divider,
@@ -120,7 +117,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   cover: {
-    height: 140,
+    height: 150,
     backgroundColor: BrandColors.tanSoft,
   },
   coverFallback: {
@@ -134,12 +131,14 @@ const styles = StyleSheet.create({
   statusPill: {
     position: 'absolute',
     top: Spacing.three - Spacing.one,
-    left: Spacing.three - Spacing.one,
+    start: Spacing.three - Spacing.one,
   },
   body: {
     flexDirection: 'row',
     gap: Spacing.three,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three - Spacing.one,
+    paddingBottom: Spacing.three,
     alignItems: 'center',
   },
   logo: {
@@ -154,9 +153,6 @@ const styles = StyleSheet.create({
   logoImage: {
     width: '100%',
     height: '100%',
-  },
-  logoInitial: {
-    color: BrandColors.primaryText,
   },
   info: {
     flex: 1,

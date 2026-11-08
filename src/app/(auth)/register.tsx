@@ -33,7 +33,7 @@ export default function RegisterScreen() {
   // Mirrors auth-service RegisterDto.
   const errors: Record<Field, string | undefined> = {
     fullName: fullName.trim() ? undefined : t('Full name is required'),
-    email: !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined,
+    email: !email.trim() ? t('Email is required') : !emailPattern.test(email.trim()) ? t('Enter a valid email') : undefined,
     phone: phoneError(phone),
     password: !password
       ? t('Password is required')
@@ -95,6 +95,7 @@ export default function RegisterScreen() {
       <FormTextInput
         testID="register-full-name"
         label={t('Full name')}
+        icon="user"
         value={fullName}
         onChangeText={setFullName}
         onBlur={markTouched('fullName')}
@@ -111,6 +112,7 @@ export default function RegisterScreen() {
         testID="register-email"
         ref={emailRef}
         label={t('Email')}
+        icon="mail"
         value={email}
         onChangeText={setEmail}
         onBlur={markTouched('email')}
@@ -129,6 +131,7 @@ export default function RegisterScreen() {
         testID="register-phone"
         ref={phoneRef}
         label={t('Phone')}
+        prefix="+20"
         value={phone}
         onChangeText={setPhone}
         onBlur={markTouched('phone')}
@@ -146,6 +149,7 @@ export default function RegisterScreen() {
         testID="register-password"
         ref={passwordRef}
         label={t('Password')}
+        icon="lock"
         value={password}
         onChangeText={setPassword}
         onBlur={markTouched('password')}

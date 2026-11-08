@@ -217,6 +217,7 @@ export default function OrderDetailScreen() {
         ) : null}
       </ScrollView>
       <Dialog
+        icon="cancel"
         visible={confirmingCancel}
         title={t('Cancel this order?')}
         message={

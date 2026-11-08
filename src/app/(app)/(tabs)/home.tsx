@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 
 import { CartBar } from '@/components/cart-bar';
+import { FilterChip } from '@/components/filter-chip';
 import { RestaurantCard } from '@/components/restaurant-card';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -10,7 +11,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
-import { BrandColors, IconSize, Layout, Radius, Spacing } from '@/constants/theme';
+import { BrandColors, FontFamily, IconSize, Layout, Radius, Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import type { Restaurant, RestaurantStatus } from '@/services/restaurants';
 import { useAuthSession } from '@/services/session';
@@ -28,6 +29,7 @@ const filterLabel = (filter: Filter) => (filter.status ? t('Open now') : t('All'
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [filter, setFilter] = useState<Filter>(FILTERS[0]);
   const debouncedSearch = useDebouncedValue(search);
 
@@ -74,13 +76,15 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.searchWrap}>
-        <View style={styles.search}>
+        <View style={[styles.search, searchFocused && styles.searchFocused]}>
           <Icon name="search" size={IconSize.md} color={BrandColors.textMuted} />
           <TextInput
             testID="home-search"
             nativeID="home-search"
             value={search}
             onChangeText={setSearch}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder={t('Search restaurants')}
             placeholderTextColor={BrandColors.textMuted}
             accessibilityLabel={t('Search restaurants')}
@@ -98,19 +102,13 @@ export default function HomeScreen() {
           {FILTERS.map((option) => {
             const selected = option.id === filter.id;
             return (
-              <Pressable
-                testID={`filter-${option.id}`}
-                nativeID={`filter-${option.id}`}
+              <FilterChip
                 key={option.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
+                testID={`filter-${option.id}`}
+                label={filterLabel(option)}
+                selected={selected}
                 onPress={() => setFilter(option)}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <ThemedText type="smallBold" style={selected ? styles.chipTextSelected : styles.chipText}>
-                  {filterLabel(option)}
-                </ThemedText>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -123,6 +121,13 @@ export default function HomeScreen() {
           renderItem={({ item }) => <RestaurantCard restaurant={item} onPress={openRestaurant} />}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={Separator}
+          ListHeaderComponent={
+            isSearching && items.length > 0 ? (
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.count} testID="home-result-count">
+                {t('{count} restaurants', { count: restaurants.data?.total ?? items.length })}
+              </ThemedText>
+            ) : null
+          }
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           initialNumToRender={4}
@@ -138,7 +143,17 @@ export default function HomeScreen() {
           }
           ListEmptyComponent={
             <StateView
+              testID="home-empty"
               icon={isSearching ? 'search' : 'store'}
+              actionLabel={isSearching ? t('Clear search') : undefined}
+              onAction={
+                isSearching
+                  ? () => {
+                      setSearch('');
+                      setFilter(FILTERS[0]);
+                    }
+                  : undefined
+              }
               title={isSearching ? t('No matches') : t('No restaurants yet')}
               message={
                 isSearching
@@ -170,6 +185,9 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
+  count: {
+    paddingBottom: Spacing.two,
+  },
   searchWrap: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
@@ -187,10 +205,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BrandColors.border,
   },
+  searchFocused: {
+    borderWidth: 2,
+    borderColor: BrandColors.text,
+    paddingHorizontal: Spacing.three - 1,
+  },
   searchInput: {
     flex: 1,
+    outlineWidth: 0,
     height: '100%',
     fontSize: 16,
+    fontFamily: FontFamily.regular,
     color: BrandColors.text,
   },
   filters: {

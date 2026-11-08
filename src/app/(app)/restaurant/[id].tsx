@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBar } from '@/components/cart-bar';
+import { FilterChip } from '@/components/filter-chip';
 import { MenuItemRow } from '@/components/menu-item-row';
 import { restaurantStatusMeta } from '@/components/restaurant-card';
 import { ThemedText } from '@/components/themed-text';
@@ -18,9 +19,10 @@ import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Spacing } from '@/constants/theme';
 import type { MenuItem } from '@/services/menus';
 import { addToCart, describeCartError, isCartRestaurantConflict, replaceCartWith, setCartQuantity, useCart } from '@/state/cart';
-import { groupMenu, useMenu, useRestaurant } from '@/state/catalog';
+import { groupMenu, type MenuSection, useMenu, useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { t } from '@/i18n';
+import { unavailableMessage } from '@/utils/restaurant-availability';
 
 export default function RestaurantScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -31,6 +33,8 @@ export default function RestaurantScreen() {
   const { data: cart } = useCart();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const listRef = useRef<SectionList<MenuItem, MenuSection>>(null);
 
   const sections = groupMenu(menu.data);
   const quantities = new Map(
@@ -46,6 +50,7 @@ export default function RestaurantScreen() {
       if (isCartRestaurantConflict(error)) {
         const startNew = await confirm({
           testID: 'new-cart-dialog',
+          icon: 'bag',
           title: t('Start a new cart?'),
           message: t('Your cart has items from another restaurant. Clear it and add {name}?', { name: item.name }),
           confirmLabel: t('Start new cart'),
@@ -103,7 +108,8 @@ export default function RestaurantScreen() {
 
   const info = restaurant.data;
   const status = restaurantStatusMeta[info.status] ?? restaurantStatusMeta.CLOSED;
-  const closed = info.status !== 'OPEN' && info.status !== 'BUSY';
+  // #286: BUSY restaurants take no orders either; the menu stays browsable and the cart is kept.
+  const notice = unavailableMessage(info.status);
 
   const header = (
     <View>
@@ -134,18 +140,35 @@ export default function RestaurantScreen() {
             {info.address}
           </ThemedText>
         </View>
-        {closed ? (
-          <InlineAlert tone="info" message={t("This restaurant isn't taking orders right now. You can still browse the menu.")} />
-        ) : null}
+        {notice ? <InlineAlert tone="info" message={notice} testID="restaurant-unavailable" /> : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
       </View>
+      {sections.length > 1 ? (
+        // Figma C-10: a chip per menu section that jumps to it.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} testID="menu-sections" nativeID="menu-sections">
+          {sections.map((section, index) => (
+            <FilterChip
+              key={section.title}
+              testID={`menu-section-${section.title}`}
+              label={section.title}
+              selected={(activeSection ?? sections[0].title) === section.title}
+              onPress={() => {
+                setActiveSection(section.title);
+                listRef.current?.scrollToLocation({ sectionIndex: index, itemIndex: 0, viewOffset: 0, animated: true });
+              }}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 
   return (
     <Screen edges={[]}>
       <SectionList
+        ref={listRef}
         sections={sections}
+        onScrollToIndexFailed={() => undefined}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={header}
         renderSectionHeader={({ section }) => (
@@ -200,7 +223,7 @@ const styles = StyleSheet.create({
   },
   floatingBack: {
     position: 'absolute',
-    left: Spacing.three,
+    start: Spacing.three,
   },
   loadingBody: {
     padding: Spacing.four,
@@ -215,8 +238,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   intro: {
-    padding: Spacing.four,
+    paddingHorizontal: Spacing.four - Spacing.one,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.three,
     gap: Spacing.two,
+  },
+  chips: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four - Spacing.one,
+    paddingBottom: Spacing.three,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BrandColors.border,
   },
   titleRow: {
     flexDirection: 'row',
@@ -229,7 +262,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   sectionHeader: {
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.four - Spacing.one,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.two,
     backgroundColor: BrandColors.background,
@@ -237,7 +270,7 @@ const styles = StyleSheet.create({
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: BrandColors.border,
-    marginHorizontal: Spacing.four,
+    marginHorizontal: Spacing.four - Spacing.one,
   },
   listContent: {
     paddingBottom: 120,

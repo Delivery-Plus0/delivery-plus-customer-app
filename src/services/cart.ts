@@ -8,6 +8,8 @@ export type CartItem = {
   name: string;
   price: number;
   quantity: number;
+  /** The menu photo (#286); null or missing when the item has none or the cart predates it. */
+  imageUrl?: string | null;
 };
 
 export type Cart = {

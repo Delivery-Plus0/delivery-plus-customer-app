@@ -1,0 +1,50 @@
+url: ${APP_URL}
+name: A restaurant that isn't taking orders - the menu stays browsable, checkout explains it and can't be placed (#286)
+tags:
+  - regression
+---
+# QA Night Cafe is seeded CLOSED; BUSY uses the same banner and button (unit-tested), with the busy text.
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: cart/closed-restaurant
+- runFlow: ../_shared/login.yaml
+- tapOn:
+    id: home-search
+- inputText: QA Night Cafe
+- extendedWaitUntil:
+    visible:
+      id: restaurant-QA Night Cafe
+    timeout: 15000
+- tapOn:
+    id: restaurant-QA Night Cafe
+- extendedWaitUntil:
+    visible:
+      id: restaurant-unavailable
+    timeout: 15000
+- assertVisible: "This restaurant isn't taking orders right now. You can still browse the menu."
+- assertVisible: QA Night Toast
+
+# The cart says so too, and checkout can't be placed until the restaurant reopens.
+- tapOn:
+    id: cart-bar
+- extendedWaitUntil:
+    visible:
+      id: cart-restaurant-unavailable
+    timeout: 15000
+- tapOn:
+    id: cart-checkout
+- extendedWaitUntil:
+    visible:
+      id: checkout-restaurant-unavailable
+    timeout: 15000
+- assertVisible:
+    id: checkout-place-order
+    enabled: false
+- assertVisible:
+    id: checkout-check-again
+
+- runScript:
+    file: ../../scripts/control.js
+    env:
+      ACTION: cart/clear

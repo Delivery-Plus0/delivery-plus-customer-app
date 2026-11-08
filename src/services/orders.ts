@@ -84,8 +84,14 @@ export function isActiveOrder(order: Pick<Order, 'status'>): boolean {
   return !TERMINAL_ORDER_STATUSES.includes(order.status);
 }
 
-export async function createOrder(idempotencyKey?: string): Promise<Order> {
-  return apiPost<Order>('/api/orders', {}, true, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
+/** Optional checkout details for POST /api/orders; without an address the order-service uses the profile address. */
+export type CreateOrderDetails = {
+  deliveryNotes?: string;
+};
+
+export async function createOrder(idempotencyKey?: string, details?: CreateOrderDetails): Promise<Order> {
+  const notes = details?.deliveryNotes?.trim();
+  return apiPost<Order>('/api/orders', notes ? { deliveryNotes: notes } : {}, true, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
 }
 
 export async function fetchMyOrders(): Promise<Order[]> {

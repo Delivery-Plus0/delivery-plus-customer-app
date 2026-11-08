@@ -40,7 +40,7 @@ export default function LoginScreen() {
   const inFlight = useRef(false);
   const passwordRef = useRef<TextInput>(null);
 
-  const emailError = !email.trim() ? 'Email is required' : !emailPattern.test(email.trim()) ? 'Enter a valid email' : undefined;
+  const emailError = !email.trim() ? t('Email is required') : !emailPattern.test(email.trim()) ? t('Enter a valid email') : undefined;
   const passwordError = !password ? t('Password is required') : undefined;
   const show = (field: keyof typeof touched) => submitted || touched[field];
 
@@ -102,6 +102,7 @@ export default function LoginScreen() {
       <FormTextInput
         testID="login-email"
         label={t('Email')}
+        icon="mail"
         value={email}
         onChangeText={edit(setEmail, { newAccount: true })}
         onBlur={() => setTouched((current) => ({ ...current, email: true }))}
@@ -120,6 +121,7 @@ export default function LoginScreen() {
         testID="login-password"
         ref={passwordRef}
         label={t('Password')}
+        icon="lock"
         value={password}
         onChangeText={edit(setPassword)}
         onBlur={() => setTouched((current) => ({ ...current, password: true }))}

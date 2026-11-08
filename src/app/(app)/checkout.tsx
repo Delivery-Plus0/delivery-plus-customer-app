@@ -6,13 +6,16 @@ import { PhoneVerificationSheet } from '@/components/phone-verification-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
+import { FormTextInput } from '@/components/ui/form-text-input';
 import { Icon } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
+import { ApiError } from '@/services/api';
 import { submitCheckout } from '@/services/checkout';
+import { isRestaurantUnavailable, unavailableErrorMessage, unavailableMessage } from '@/utils/restaurant-availability';
 import { isCartChanged } from '@/utils/cart-changes';
 import { reloadCart, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
@@ -42,6 +45,8 @@ export default function CheckoutScreen() {
   // #153: ordering can require a verified phone; the next step is offered right here.
   const [needsVerifiedPhone, setNeedsVerifiedPhone] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  // Instructions for the driver (gate code, floor…), sent as deliveryNotes with the order.
+  const [deliveryNotes, setDeliveryNotes] = useState('');
   const profile = useProfile();
   // Stable for this checkout attempt so a retry can never create a duplicate order or charge.
   const orderIdempotencyKey = useRef(createIdempotencyKey('order'));
@@ -53,7 +58,11 @@ export default function CheckoutScreen() {
       setErrorMessage(null);
       setFailedOrderId(null);
       setNeedsVerifiedPhone(false);
-      const { order, payment } = await submitCheckout(orderIdempotencyKey.current, paymentIdempotencyKey.current);
+      const { order, payment } = await submitCheckout(
+        orderIdempotencyKey.current,
+        paymentIdempotencyKey.current,
+        deliveryNotes.trim() ? { deliveryNotes } : undefined,
+      );
 
       // The order-service empties the cart once the order exists, whatever happens to payment.
       void reloadCart();
@@ -78,6 +87,18 @@ export default function CheckoutScreen() {
       if (isCartChanged(error)) {
         void reloadCart();
         setErrorMessage(t('Your cart changed: a price, an item or a quantity is different now. Check your order and place it again.'));
+        return;
+      }
+      // #286: the restaurant went BUSY or CLOSED since the customer opened checkout. Refresh it so the
+      // banner and the disabled button below explain it; the cart is untouched.
+      if (isRestaurantUnavailable(error)) {
+        void restaurant.refresh();
+        setErrorMessage(unavailableErrorMessage(error));
+        return;
+      }
+      // 409 OutOfDeliveryArea: the profile address is beyond this restaurant's delivery radius.
+      if (error instanceof ApiError && error.error === 'OutOfDeliveryArea') {
+        setErrorMessage(t('This restaurant does not deliver to your address. Change your address in your profile or pick a closer restaurant.'));
         return;
       }
       setNeedsVerifiedPhone(isPhoneNotVerified(error));
@@ -124,6 +145,9 @@ export default function CheckoutScreen() {
     );
   }
 
+  // #286: a BUSY or CLOSED restaurant takes no orders, so say so before the customer taps "Place order".
+  const unavailable = failedOrderId ? null : unavailableMessage(restaurant.data?.status);
+
   const footer = failedOrderId ? (
     <AppButton
       testID="checkout-view-order"
@@ -137,7 +161,7 @@ export default function CheckoutScreen() {
       title={quote.data ? t('Place order · {total}', { total: formatMoney(quote.data.totalAmount) }) : t('Place order')}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
-      disabled={!quote.data}
+      disabled={!quote.data || Boolean(unavailable)}
       accessibilityHint={t('Creates your order and charges the total shown')}
     />
   );
@@ -146,7 +170,24 @@ export default function CheckoutScreen() {
     <Screen footer={footer}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
-        {errorMessage ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
+        {unavailable ? (
+          <View style={styles.unavailable}>
+            <InlineAlert tone="info" message={unavailable} testID="checkout-restaurant-unavailable" />
+            <AppButton
+              testID="checkout-check-again"
+              title={t('Check again')}
+              icon="refresh"
+              variant="secondary"
+              size="sm"
+              loading={restaurant.refreshing}
+              onPress={() => {
+                setErrorMessage(null);
+                void restaurant.refresh();
+              }}
+            />
+          </View>
+        ) : null}
+        {errorMessage && errorMessage !== unavailable ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
         {needsVerifiedPhone ? (
           profile.data?.phone ? (
             <AppButton testID="checkout-verify-phone" title={t('Verify your phone')} icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
@@ -172,13 +213,57 @@ export default function CheckoutScreen() {
           </Card>
         ) : null}
 
+        {/* Figma C-15: the order goes to the profile address (order-service uses it when none is sent). */}
+        <Card style={styles.row} testID="checkout-deliver-to">
+          <View style={styles.iconWrap}>
+            <Icon name="location" size={IconSize.md} color={BrandColors.primary} />
+          </View>
+          <View style={styles.flex}>
+            <ThemedText type="caption" themeColor="textSecondary">
+              {t('DELIVER TO')}
+            </ThemedText>
+            {profile.data?.address ? (
+              <>
+                <ThemedText type="defaultBold" numberOfLines={2}>
+                  {profile.data.address}
+                </ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {t('From your profile')}
+                </ThemedText>
+              </>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('Add a delivery address in your profile.')}
+              </ThemedText>
+            )}
+          </View>
+          <AppButton
+            testID="checkout-change-address"
+            title={profile.data?.address ? t('Change') : t('Add')}
+            variant="ghost"
+            size="sm"
+            onPress={() => router.navigate('/profile')}
+          />
+        </Card>
+
+        <FormTextInput
+          testID="checkout-delivery-notes"
+          label={t('Notes for the driver (optional)')}
+          placeholder={t('Gate code, floor, landmark…')}
+          icon="edit"
+          value={deliveryNotes}
+          onChangeText={setDeliveryNotes}
+          maxLength={500}
+          returnKeyType="done"
+        />
+
         {items.length > 0 ? (
           <Card>
             <ThemedText type="heading">{t('Order summary')}</ThemedText>
             {items.map((item) => (
               <View key={item.menuItemId} style={styles.itemRow}>
                 <ThemedText type="small" style={styles.flex}>
-                  <ThemedText type="smallBold">{item.quantity}×</ThemedText> {item.name}
+                  <ThemedText type="smallBold" style={styles.quantity}>{item.quantity}×</ThemedText> {item.name}
                 </ThemedText>
                 <ThemedText type="small">{formatMoney(item.price * item.quantity)}</ThemedText>
               </View>
@@ -217,15 +302,15 @@ export default function CheckoutScreen() {
               />
             ) : (
               <ThemedText type="small" themeColor="textSecondary" testID="checkout-quote-loading">
-                Working out the delivery fee…
+                {t('Working out the delivery fee…')}
               </ThemedText>
             )}
           </Card>
         ) : null}
 
         <Card style={styles.row}>
-          <View style={styles.iconWrap}>
-            <Icon name="check" size={IconSize.md} color={BrandColors.primaryText} />
+          <View style={[styles.iconWrap, styles.iconWrapSuccess]}>
+            <Icon name="shield" size={IconSize.md} color={BrandColors.success} />
           </View>
           <View style={styles.flex}>
             <ThemedText type="defaultBold">{t('Payment')}</ThemedText>
@@ -251,8 +336,11 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
+  unavailable: {
+    gap: Spacing.two,
+  },
   content: {
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.four - Spacing.one,
     paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
@@ -265,12 +353,18 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
     backgroundColor: BrandColors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconWrapSuccess: {
+    backgroundColor: BrandColors.successSoft,
+  },
+  quantity: {
+    color: BrandColors.primaryText,
   },
   itemRow: {
     flexDirection: 'row',

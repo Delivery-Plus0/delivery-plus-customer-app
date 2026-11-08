@@ -57,7 +57,7 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 | Suite | Flows | Runs in CI |
 | --- | --- | --- |
 | `smoke` | login → Home · search → restaurant → menu · add → change quantity → total · cart → checkout → order | every PR |
-| `regression` | **cross-app:** the driver goes offline in the driver app, a ready order waits ("Finding a driver"), the driver goes online in the driver app and the customer sees "Driver assigned" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session · change password (a wrong current password keeps the session) and forgot password by texted code, each on a fresh account with a verified phone | nightly / manual |
+| `regression` | **cross-app:** the driver goes offline in the driver app, a ready order waits ("Finding a driver"), the driver goes online in the driver app and the customer sees "Driver assigned" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session · change password (a wrong current password keeps the session) and forgot password by texted code, each on a fresh account with a verified phone · a restaurant that isn't taking orders (QA Night Cafe, CLOSED): the menu stays browsable, the cart and checkout explain it, and *Place order* is disabled (#286) | nightly / manual |
 | `session` | **60-second access tokens:** signed in for six minutes, reloading screens that need the API after every token expiry (five refreshes) · sign out → welcome screen, and a reload stays signed out | every PR and nightly, after the main suite, with auth-service restarted at `JWT_EXPIRES_IN=60s` |
 | `verification` | **email verification on:** sign up → the code screen with the resend countdown → a wrong code is refused → the right code → sign in → Home · an unverified account signs in → the code screen → Resend inside the minute is refused (429, countdown restarts) → after it a new code → verify → sign in → Home | every PR and nightly, after the session suite, with auth-service restarted at `EMAIL_VERIFICATION_REQUIRED=true` |
 | `business` | **three apps, no API stand-ins**: customer orders in the customer app → the order appears on the **restaurant app**'s kitchen board → *Start preparing* → *Ready for pickup* in the restaurant app → automatic dispatch waits until the driver goes online **in the driver app** → driver app shows the job (pickup, drop-off, items) and shares its location → customer sees "Driver assigned" and the location is in the customer's tracking view → driver app: picked up, start, delivered, each seen in the customer app → Delivered → integrity check (one delivery, no new dead letters) → confirmation notification | nightly / manual |
@@ -108,7 +108,8 @@ automatic dispatch.
 - read the id of the order just placed in the customer app (`order/placed`, read-only as the
   customer), so the restaurant and driver apps' cards can be addressed by it.
 - regression set-up only: a ready order through the API as customer + restaurant
-  (`scenario/order-ready`). The business flow has no API stand-ins.
+  (`scenario/order-ready`); a cart from the closed QA Night Cafe (`cart/closed-restaurant`) and an
+  empty cart afterwards (`cart/clear`). The business flow has no API stand-ins.
 - **verify** server-side state, read-only: `tracking/assert-location` (the customer's
   `GET /api/tracking/delivery/:id` returns the driver app's position; the customer app has no map
   yet) and `verify/order-integrity` (order and delivery DELIVERED, exactly one delivery row for the

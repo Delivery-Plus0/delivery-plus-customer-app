@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Image, StyleSheet, View } from 'react-native';
 
+import { AuthLanguageToggle } from '@/components/auth-form-shell';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -17,6 +18,9 @@ const FEATURES: { icon: IconName; title: string; subtitle: string }[] = [
 export default function WelcomeScreen() {
   return (
     <Screen edges={['top', 'bottom']}>
+      <View style={styles.topBar}>
+        <AuthLanguageToggle />
+      </View>
       <View style={styles.content}>
         <View style={styles.hero}>
           <Image
@@ -25,10 +29,10 @@ export default function WelcomeScreen() {
             resizeMode="contain"
             accessibilityLabel={t('Delivery Plus')}
           />
-          <ThemedText type="title" style={styles.center} accessibilityRole="header">
+          <ThemedText type="title" accessibilityRole="header">
             {t('Fast meals, delivered your way.')}
           </ThemedText>
-          <ThemedText type="default" themeColor="textSecondary" style={styles.center}>
+          <ThemedText type="default" themeColor="textSecondary">
             {t('Discover local favorites, build your cart in seconds, and track your order from kitchen to door.')}
           </ThemedText>
         </View>
@@ -37,7 +41,7 @@ export default function WelcomeScreen() {
           {FEATURES.map((feature) => (
             <View key={feature.title} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Icon name={feature.icon} size={IconSize.md} color={BrandColors.primaryText} />
+                <Icon name={feature.icon} size={IconSize.md} color={BrandColors.primary} />
               </View>
               <View style={styles.featureText}>
                 <ThemedText type="smallBold">{feature.title}</ThemedText>
@@ -59,28 +63,31 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.one,
+  },
   content: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.five,
+    paddingHorizontal: Spacing.four - Spacing.one,
+    paddingTop: Spacing.four,
     paddingBottom: Spacing.three,
-    gap: Spacing.four,
+    gap: Spacing.five,
   },
   hero: {
     gap: Spacing.three,
   },
   logo: {
-    width: 220,
-    height: 64,
-    alignSelf: 'center',
-    marginBottom: Spacing.two,
-  },
-  center: {
-    textAlign: 'center',
+    width: 180,
+    height: 44,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.four,
   },
   features: {
-    gap: Spacing.three,
+    flex: 1,
+    gap: Spacing.four - Spacing.one,
   },
   featureRow: {
     flexDirection: 'row',
@@ -91,7 +98,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: Radius.sm,
-    backgroundColor: BrandColors.primarySoft,
+    backgroundColor: BrandColors.tanSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -99,6 +106,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actions: {
-    gap: Spacing.three,
+    gap: Spacing.two + Spacing.one,
   },
 });
