@@ -31,7 +31,7 @@ export function QuantityStepper({ quantity, onChange, itemName, disabled = false
       >
         <Icon name={quantity <= 1 ? 'trash' : 'minus'} size={IconSize.sm} color={BrandColors.primaryText} />
       </Pressable>
-      <Text style={styles.quantity} accessibilityLabel={`${quantity} in cart`} testID={testID && `${testID}-value`} nativeID={testID && `${testID}-value`}>
+      <Text style={styles.quantity} accessibilityLabel={t('{count} in cart', { count: quantity })} testID={testID && `${testID}-value`} nativeID={testID && `${testID}-value`}>
         {quantity}
       </Text>
       <Pressable
