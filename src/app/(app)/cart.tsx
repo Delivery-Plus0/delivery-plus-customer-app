@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -5,18 +6,20 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { AppButton } from '@/components/ui/app-button';
 import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
 import { InlineAlert } from '@/components/ui/inline-alert';
 import { QuantityStepper } from '@/components/ui/quantity-stepper';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ErrorState, StateView } from '@/components/ui/state-view';
-import { BrandColors, Spacing } from '@/constants/theme';
+import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { cartItemCount, describeCartError, emptyCart, setCartQuantity, useCart } from '@/state/cart';
 import { MAX_ITEM_QUANTITY } from '@/services/cart';
 import { useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { formatMoney } from '@/utils/format';
 import { t, tn } from '@/i18n';
+import { unavailableMessage } from '@/utils/restaurant-availability';
 
 export default function CartScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -25,6 +28,8 @@ export default function CartScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const items = cart.data?.items ?? [];
+  // #286: tell the customer before checkout when the restaurant is busy or closed; the cart stays.
+  const unavailable = unavailableMessage(restaurant.data?.status);
   const count = cartItemCount(cart.data);
 
   const changeQuantity = (menuItemId: string, quantity: number) => {
@@ -120,9 +125,10 @@ export default function CartScreen() {
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={Separator}
         ListHeaderComponent={
-          actionError ? (
+          actionError || unavailable ? (
             <View style={styles.alert}>
-              <InlineAlert message={actionError} onDismiss={() => setActionError(null)} />
+              {unavailable ? <InlineAlert tone="info" message={unavailable} testID="cart-restaurant-unavailable" /> : null}
+              {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
             </View>
           ) : null
         }
@@ -136,6 +142,14 @@ export default function CartScreen() {
         }
         renderItem={({ item }) => (
           <Card style={styles.itemCard}>
+            {/* Figma C-12: the dish photo, or a food tile when it has none. */}
+            <View style={styles.thumb} testID={`cart-thumb-${item.name}`}>
+              {item.imageUrl ? (
+                <Image source={item.imageUrl} style={styles.thumbImage} contentFit="cover" cachePolicy="memory-disk" accessibilityIgnoresInvertColors />
+              ) : (
+                <Icon name="food" size={IconSize.md} color={BrandColors.packageTan} />
+              )}
+            </View>
             <View style={styles.itemInfo}>
               <ThemedText type="defaultBold" numberOfLines={2}>
                 {item.name}
@@ -175,7 +189,21 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
   },
   alert: {
+    gap: Spacing.two,
     marginBottom: Spacing.three,
+  },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BrandColors.tanSoft,
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
   },
   itemCard: {
     flexDirection: 'row',

@@ -72,6 +72,7 @@ const SUITES = {
     'regression/arabic.yaml',
     'regression/unauthorized-order.yaml',
     'regression/offline-recovery.yaml',
+    'regression/restaurant-unavailable.yaml',
   ],
   business: ['business/customer-order-lifecycle.yaml'],
   // #34: needs the stack's access tokens at 60 s (JWT_EXPIRES_IN=60s), so it is not part of `all`.
@@ -357,6 +358,16 @@ const actions = {
       if (Date.now() > deadline) throw new Error(`No reset code was texted to ${phone}`);
       await new Promise((r) => setTimeout(r, 250));
     }
+  },
+  // #286: a cart from the seeded CLOSED restaurant (QA Night Cafe), so checkout explains it isn't taking orders.
+  'cart/closed-restaurant': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    await api('DELETE', '/api/cart', customer);
+    await api('POST', '/api/cart/items', customer, { menuItemId: manifest.menuItems['QA Night Toast'], quantity: 1 });
+  },
+  'cart/clear': async () => {
+    const customer = await login(manifest.accounts.customer.email);
+    await api('DELETE', '/api/cart', customer);
   },
   'profile/clear-avatar': async () => {
     const customer = await login(manifest.accounts.customer.email);

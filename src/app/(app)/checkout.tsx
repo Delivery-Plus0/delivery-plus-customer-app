@@ -15,6 +15,7 @@ import { ErrorState, StateView } from '@/components/ui/state-view';
 import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { ApiError } from '@/services/api';
 import { submitCheckout } from '@/services/checkout';
+import { isRestaurantUnavailable, unavailableErrorMessage, unavailableMessage } from '@/utils/restaurant-availability';
 import { isCartChanged } from '@/utils/cart-changes';
 import { reloadCart, useCart } from '@/state/cart';
 import { useRestaurant } from '@/state/catalog';
@@ -88,6 +89,13 @@ export default function CheckoutScreen() {
         setErrorMessage(t('Your cart changed: a price, an item or a quantity is different now. Check your order and place it again.'));
         return;
       }
+      // #286: the restaurant went BUSY or CLOSED since the customer opened checkout. Refresh it so the
+      // banner and the disabled button below explain it; the cart is untouched.
+      if (isRestaurantUnavailable(error)) {
+        void restaurant.refresh();
+        setErrorMessage(unavailableErrorMessage(error));
+        return;
+      }
       // 409 OutOfDeliveryArea: the profile address is beyond this restaurant's delivery radius.
       if (error instanceof ApiError && error.error === 'OutOfDeliveryArea') {
         setErrorMessage(t('This restaurant does not deliver to your address. Change your address in your profile or pick a closer restaurant.'));
@@ -137,6 +145,9 @@ export default function CheckoutScreen() {
     );
   }
 
+  // #286: a BUSY or CLOSED restaurant takes no orders, so say so before the customer taps "Place order".
+  const unavailable = failedOrderId ? null : unavailableMessage(restaurant.data?.status);
+
   const footer = failedOrderId ? (
     <AppButton
       testID="checkout-view-order"
@@ -150,7 +161,7 @@ export default function CheckoutScreen() {
       title={quote.data ? t('Place order · {total}', { total: formatMoney(quote.data.totalAmount) }) : t('Place order')}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
-      disabled={!quote.data}
+      disabled={!quote.data || Boolean(unavailable)}
       accessibilityHint={t('Creates your order and charges the total shown')}
     />
   );
@@ -159,7 +170,24 @@ export default function CheckoutScreen() {
     <Screen footer={footer}>
       {header}
       <ScrollView contentContainerStyle={styles.content}>
-        {errorMessage ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
+        {unavailable ? (
+          <View style={styles.unavailable}>
+            <InlineAlert tone="info" message={unavailable} testID="checkout-restaurant-unavailable" />
+            <AppButton
+              testID="checkout-check-again"
+              title={t('Check again')}
+              icon="refresh"
+              variant="secondary"
+              size="sm"
+              loading={restaurant.refreshing}
+              onPress={() => {
+                setErrorMessage(null);
+                void restaurant.refresh();
+              }}
+            />
+          </View>
+        ) : null}
+        {errorMessage && errorMessage !== unavailable ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
         {needsVerifiedPhone ? (
           profile.data?.phone ? (
             <AppButton testID="checkout-verify-phone" title={t('Verify your phone')} icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
@@ -308,6 +336,9 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
+  unavailable: {
+    gap: Spacing.two,
+  },
   content: {
     paddingHorizontal: Spacing.four - Spacing.one,
     paddingBottom: Spacing.four,

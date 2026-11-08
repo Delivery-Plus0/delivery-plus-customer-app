@@ -22,6 +22,7 @@ import { addToCart, describeCartError, isCartRestaurantConflict, replaceCartWith
 import { groupMenu, type MenuSection, useMenu, useRestaurant } from '@/state/catalog';
 import { useConfirm } from '@/hooks/use-confirm';
 import { t } from '@/i18n';
+import { unavailableMessage } from '@/utils/restaurant-availability';
 
 export default function RestaurantScreen() {
   const [confirmDialog, confirm] = useConfirm();
@@ -107,7 +108,8 @@ export default function RestaurantScreen() {
 
   const info = restaurant.data;
   const status = restaurantStatusMeta[info.status] ?? restaurantStatusMeta.CLOSED;
-  const closed = info.status !== 'OPEN' && info.status !== 'BUSY';
+  // #286: BUSY restaurants take no orders either; the menu stays browsable and the cart is kept.
+  const notice = unavailableMessage(info.status);
 
   const header = (
     <View>
@@ -138,9 +140,7 @@ export default function RestaurantScreen() {
             {info.address}
           </ThemedText>
         </View>
-        {closed ? (
-          <InlineAlert tone="info" message={t("This restaurant isn't taking orders right now. You can still browse the menu.")} />
-        ) : null}
+        {notice ? <InlineAlert tone="info" message={notice} testID="restaurant-unavailable" /> : null}
         {actionError ? <InlineAlert message={actionError} onDismiss={() => setActionError(null)} /> : null}
       </View>
       {sections.length > 1 ? (
