@@ -3,6 +3,15 @@ import { t } from '@/i18n/core';
 /** Where the customer wants the order delivered (#54): a point, and how it was chosen. */
 export type DeliveryLocation = { latitude: number; longitude: number; source: 'device' | 'map' };
 
+/**
+ * The coordinate fields' input style (#78):
+ * - `minWidth: 0` lets the input shrink to its half-width field. Without it a web `<input>` keeps its
+ *   intrinsic width (~20 characters) and overflows the field: to the right in English (the text still
+ *   shows), but to the left in Arabic, where the placeholder and the typed value end up outside the card.
+ * - Coordinates are numbers, so they read left-to-right even in an Arabic (RTL) form.
+ */
+export const COORDINATE_INPUT_STYLE = { minWidth: 0, textAlign: 'left', writingDirection: 'ltr' } as const;
+
 /** A finite coordinate pair within range, or false. */
 export function isValidPoint(point: unknown): point is { latitude: number; longitude: number } {
   if (!point || typeof point !== 'object') return false;

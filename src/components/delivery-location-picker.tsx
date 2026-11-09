@@ -12,7 +12,7 @@ import { BrandColors, IconSize, Radius, Spacing } from '@/constants/theme';
 import { t } from '@/i18n';
 import { currentPosition } from '@/services/location';
 import { setDeliveryLocation } from '@/state/delivery-location';
-import { parseCoordinate, type DeliveryLocation } from '@/utils/delivery-location';
+import { COORDINATE_INPUT_STYLE, parseCoordinate, type DeliveryLocation } from '@/utils/delivery-location';
 
 /**
  * "Where should we deliver?" (#54), before the restaurant list: the device's location, or a pin on the
@@ -82,10 +82,10 @@ export function DeliveryLocationPicker({ current, onCancel }: { current: Deliver
       ) : null}
       <View style={styles.coordinates}>
         <View style={styles.flex}>
-          <FormTextInput testID="location-latitude" label={t('Latitude')} keyboardType="numbers-and-punctuation" value={latitude} onChangeText={setLatitude} placeholder="30.0444" />
+          <FormTextInput testID="location-latitude" label={t('Latitude')} keyboardType="numbers-and-punctuation" value={latitude} onChangeText={setLatitude} placeholder="30.0444" style={COORDINATE_INPUT_STYLE} />
         </View>
         <View style={styles.flex}>
-          <FormTextInput testID="location-longitude" label={t('Longitude')} keyboardType="numbers-and-punctuation" value={longitude} onChangeText={setLongitude} placeholder="31.2357" />
+          <FormTextInput testID="location-longitude" label={t('Longitude')} keyboardType="numbers-and-punctuation" value={longitude} onChangeText={setLongitude} placeholder="31.2357" style={COORDINATE_INPUT_STYLE} />
         </View>
       </View>
       {touched && pinError ? <InlineAlert message={pinError} testID="location-pin-error" /> : null}
