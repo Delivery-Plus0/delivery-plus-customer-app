@@ -22,11 +22,14 @@ describe('delivery location (#54)', () => {
     expect(parseCoordinate('', 'latitude')).toBeNull();
   });
 
-  it('keeps the coordinate fields left-to-right in Arabic (#78)', () => {
+  it('keeps the coordinate fields inside their boxes and left-to-right in Arabic (#78)', () => {
+    expect(COORDINATE_INPUT_STYLE.minWidth).toBe(0);
     expect(COORDINATE_INPUT_STYLE.writingDirection).toBe('ltr');
     expect(COORDINATE_INPUT_STYLE.textAlign).toBe('left');
-    // A real text input (react-native-web) rendered with the style emits LTR direction and left alignment.
+    // A real text input (react-native-web) rendered with the style can shrink to its field (the cause of
+    // #78: a web input's intrinsic width overflowed the half-width field), and reads left-to-right.
     const html = renderToStaticMarkup(createElement(TextInput, { placeholder: '30.0444', style: COORDINATE_INPUT_STYLE }));
+    expect(html).toMatch(/min-width:0(px)?[;"]/);
     expect(html).toMatch(/direction:ltr/);
     expect(html).toMatch(/text-align:left/);
     // FormTextInput puts `style` into the TextInput's style array (the picker's inputs use it).
