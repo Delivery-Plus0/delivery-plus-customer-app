@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { BrandColors, Elevation, IconSize, Radius, Spacing } from '@/constants/theme';
 import type { Restaurant, RestaurantStatus } from '@/services/restaurants';
 import { t } from '@/i18n';
+import { formatDistance } from '@/utils/delivery-location';
 
 export const restaurantStatusMeta: Record<RestaurantStatus, { label: string; tone: BadgeTone }> = {
   OPEN: {
@@ -93,6 +94,13 @@ export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress
           ) : null}
           <View style={styles.addressRow}>
             <Icon name="location" size={14} color={BrandColors.textMuted} />
+            {/* #54: on a list filtered by the delivery location, how far it is from there. */}
+            {formatDistance(restaurant.distanceKm) ? (
+              <ThemedText type="caption" style={styles.distance} testID={`restaurant-${restaurant.name}-distance`}>
+                {formatDistance(restaurant.distanceKm)}
+                {' · '}
+              </ThemedText>
+            ) : null}
             <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1} style={styles.address}>
               {restaurant.address}
             </ThemedText>
@@ -104,6 +112,10 @@ export const RestaurantCard = memo(function RestaurantCard({ restaurant, onPress
 });
 
 const styles = StyleSheet.create({
+  distance: {
+    color: BrandColors.text,
+    fontWeight: '600',
+  },
   card: {
     backgroundColor: BrandColors.surface,
     borderRadius: Radius.md,

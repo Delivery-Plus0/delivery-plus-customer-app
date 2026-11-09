@@ -22,6 +22,8 @@ import { useRestaurant } from '@/state/catalog';
 import { invalidateResources } from '@/state/resource-cache';
 import { useOrderQuote } from '@/state/orders';
 import { useProfile } from '@/state/profile';
+import { requestLocationPicker, useDeliveryLocation } from '@/state/delivery-location';
+import { locationLabel } from '@/utils/delivery-location';
 import { isPhoneNotVerified } from '@/utils/phone-verification';
 import { formatMoney } from '@/utils/format';
 import { t } from '@/i18n';
@@ -48,6 +50,9 @@ export default function CheckoutScreen() {
   // Instructions for the driver (gate code, floor…), sent as deliveryNotes with the order.
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const profile = useProfile();
+  // #54: the delivery location chosen on Home; sent with the profile address so the backend checks the area.
+  const { location } = useDeliveryLocation();
+  const [outOfArea, setOutOfArea] = useState(false);
   // Stable for this checkout attempt so a retry can never create a duplicate order or charge.
   const orderIdempotencyKey = useRef(createIdempotencyKey('order'));
   const paymentIdempotencyKey = useRef(createIdempotencyKey('payment'));
@@ -58,10 +63,13 @@ export default function CheckoutScreen() {
       setErrorMessage(null);
       setFailedOrderId(null);
       setNeedsVerifiedPhone(false);
+      setOutOfArea(false);
+      const delivery = location && profile.data?.address ? { address: profile.data.address, latitude: location.latitude, longitude: location.longitude } : undefined;
+      const details = { ...(deliveryNotes.trim() ? { deliveryNotes } : {}), ...(delivery ? { delivery } : {}) };
       const { order, payment } = await submitCheckout(
         orderIdempotencyKey.current,
         paymentIdempotencyKey.current,
-        deliveryNotes.trim() ? { deliveryNotes } : undefined,
+        Object.keys(details).length ? details : undefined,
       );
 
       // The order-service empties the cart once the order exists, whatever happens to payment.
@@ -96,9 +104,11 @@ export default function CheckoutScreen() {
         setErrorMessage(unavailableErrorMessage(error));
         return;
       }
-      // 409 OutOfDeliveryArea: the profile address is beyond this restaurant's delivery radius.
+      // 409 OutOfDeliveryArea: the delivery location is beyond this restaurant's delivery radius (e.g. it was
+      // changed after browsing). Recoverable: change the location, or pick a restaurant that delivers there.
       if (error instanceof ApiError && error.error === 'OutOfDeliveryArea') {
-        setErrorMessage(t('This restaurant does not deliver to your address. Change your address in your profile or pick a closer restaurant.'));
+        setOutOfArea(true);
+        setErrorMessage(t('This restaurant does not deliver to your delivery location. Choose another location, or a restaurant closer to you. Your cart is saved.'));
         return;
       }
       setNeedsVerifiedPhone(isPhoneNotVerified(error));
@@ -188,6 +198,18 @@ export default function CheckoutScreen() {
           </View>
         ) : null}
         {errorMessage && errorMessage !== unavailable ? <InlineAlert message={errorMessage} testID="checkout-error" /> : null}
+        {outOfArea ? (
+          <AppButton
+            testID="checkout-change-location"
+            title={t('Change delivery location')}
+            icon="location"
+            variant="secondary"
+            onPress={() => {
+              requestLocationPicker();
+              router.navigate('/home');
+            }}
+          />
+        ) : null}
         {needsVerifiedPhone ? (
           profile.data?.phone ? (
             <AppButton testID="checkout-verify-phone" title={t('Verify your phone')} icon="phone" variant="secondary" onPress={() => setVerifying(true)} />
@@ -227,8 +249,8 @@ export default function CheckoutScreen() {
                 <ThemedText type="defaultBold" numberOfLines={2}>
                   {profile.data.address}
                 </ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {t('From your profile')}
+                <ThemedText type="caption" themeColor="textSecondary" testID="checkout-location-source">
+                  {location ? t('From your profile · {place}', { place: locationLabel(location) }) : t('From your profile')}
                 </ThemedText>
               </>
             ) : (

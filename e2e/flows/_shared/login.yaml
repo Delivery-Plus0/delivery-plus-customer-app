@@ -19,3 +19,4 @@ url: ${APP_URL}/login
     visible:
       id: home-title
     timeout: 20000
+- runFlow: set-location.yaml

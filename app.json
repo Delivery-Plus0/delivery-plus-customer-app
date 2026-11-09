@@ -35,6 +35,12 @@
       ],
       "expo-secure-store",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Delivery Plus uses your location to show the restaurants that deliver to you."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Delivery Plus uses your photos to set your profile picture.",

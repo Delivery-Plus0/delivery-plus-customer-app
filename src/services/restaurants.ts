@@ -11,6 +11,13 @@ export type Restaurant = {
   logoUrl?: string | null;
   address: string;
   status: RestaurantStatus;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** The effective delivery radius, in kilometres. */
+  deliveryRadiusKm?: number;
+  /** Only on a list filtered by a delivery location: how far the restaurant is from it. */
+  distanceKm?: number;
+  cuisineTags?: string[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -31,10 +38,17 @@ export type RestaurantListQuery = {
   search?: string;
   sortBy?: 'name' | 'createdAt';
   sortOrder?: 'ASC' | 'DESC';
+  /** #54: only restaurants that deliver to this point, nearest first (backend #209). */
+  lat?: number;
+  lng?: number;
 };
 
-export function buildRestaurantQuery({ page = 1, limit = 20, status, search, sortBy, sortOrder }: RestaurantListQuery = {}): string {
+export function buildRestaurantQuery({ page = 1, limit = 20, status, search, sortBy, sortOrder, lat, lng }: RestaurantListQuery = {}): string {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (lat !== undefined && lng !== undefined) {
+    params.set('lat', String(lat));
+    params.set('lng', String(lng));
+  }
   if (status) params.set('status', status);
   if (search?.trim()) params.set('search', search.trim());
   if (sortBy) params.set('sortBy', sortBy);

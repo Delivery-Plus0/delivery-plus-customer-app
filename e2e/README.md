@@ -56,7 +56,7 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 
 | Suite | Flows | Runs in CI |
 | --- | --- | --- |
-| `smoke` | login → Home · search → restaurant → menu · add → change quantity → total · cart → checkout → order | every PR |
+| `smoke` | login → Home (the delivery location: the device location, pinned to QA Kitchen's street in E2E builds) · search → restaurant → menu · add → change quantity → total · cart → checkout → order · a far pin shows no restaurants, and the current location brings QA Kitchen back with its distance (#54) | every PR |
 | `regression` | **cross-app:** the driver goes offline in the driver app, a ready order waits ("Finding a driver"), the driver goes online in the driver app and the customer sees "Driver assigned" · declined payment shows Failed · another customer's order is refused · gateway outage shows offline state and recovers without losing the session · change password (a wrong current password keeps the session) and forgot password by texted code, each on a fresh account with a verified phone · a restaurant that isn't taking orders (QA Night Cafe, CLOSED): the menu stays browsable, the cart and checkout explain it, and *Place order* is disabled (#286) | nightly / manual |
 | `session` | **60-second access tokens:** signed in for six minutes, reloading screens that need the API after every token expiry (five refreshes) · sign out → welcome screen, and a reload stays signed out | every PR and nightly, after the main suite, with auth-service restarted at `JWT_EXPIRES_IN=60s` |
 | `verification` | **email verification on:** sign up → the code screen with the resend countdown → a wrong code is refused → the right code → sign in → Home · an unverified account signs in → the code screen → Resend inside the minute is refused (429, countdown restarts) → after it a new code → verify → sign in → Home | every PR and nightly, after the session suite, with auth-service restarted at `EMAIL_VERIFICATION_REQUIRED=true` |
@@ -68,7 +68,8 @@ Tear down with `npm run e2e:env:down` (in `delivery-plus`; removes the E2E volum
 | --- | --- | --- |
 | `qa.customer@delivery-plus.test` | CUSTOMER | signs in to the app in every flow |
 | `qa.customer2@delivery-plus.test` | CUSTOMER | owns the order the QA customer must not see |
-| `qa.restaurant@delivery-plus.test` | RESTAURANT_OWNER | signs in to the **restaurant app** in the business flow; owns QA Kitchen (OPEN) and QA Night Cafe (CLOSED) |
+| `qa.restaurant@delivery-plus.test` | RESTAURANT_OWNER | signs in to the **restaurant app** in the business flow; owns QA Kitchen (OPEN) |
+| `qa.restaurant2@delivery-plus.test` | RESTAURANT_OWNER | owns QA Night Cafe (CLOSED); one restaurant per owner (backend #208) |
 | `qa.driver@delivery-plus.test` | DRIVER | signs in to the **driver app** in the cross-app flows |
 
 Password: `E2E_PASSWORD` (test-only default `Qa-Only-Passw0rd!`; the seed refuses non-localhost
