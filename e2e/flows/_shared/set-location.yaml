@@ -1,0 +1,19 @@
+# Shared (#54): on Home, choose the delivery location when the app asks for it. E2E builds pin the
+# device location to QA Kitchen's street (EXPO_PUBLIC_FIXED_LOCATION), so "current location" is there.
+url: ${APP_URL}
+---
+- extendedWaitUntil:
+    visible:
+      id: home-title
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: location-use-current
+    commands:
+      - tapOn:
+          id: location-use-current
+- extendedWaitUntil:
+    visible:
+      id: delivery-location
+    timeout: 15000

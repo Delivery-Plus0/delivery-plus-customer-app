@@ -67,6 +67,7 @@ tags:
 - inputText: ${PASSWORD}
 - tapOn:
     id: login-submit
+- runFlow: ../_shared/set-location.yaml
 - extendedWaitUntil:
     visible:
       id: restaurant-QA Kitchen

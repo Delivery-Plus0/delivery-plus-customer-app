@@ -5,7 +5,8 @@ import { fetchRestaurantById, fetchRestaurants, type RestaurantListQuery } from 
 const CATALOG_STALE_MS = 60_000;
 
 export function useRestaurants(query: RestaurantListQuery) {
-  const key = `restaurants:${query.status ?? 'ALL'}:${query.search?.trim().toLowerCase() ?? ''}`;
+  const point = query.lat !== undefined && query.lng !== undefined ? `${query.lat},${query.lng}` : 'anywhere';
+  const key = `restaurants:${point}:${query.status ?? 'ALL'}:${query.search?.trim().toLowerCase() ?? ''}`;
   return useResource(key, () => fetchRestaurants(query), { staleTimeMs: CATALOG_STALE_MS, keepPreviousData: true });
 }
 

@@ -129,7 +129,7 @@ export default function OrderDetailScreen() {
           />
         ) : null}
 
-        {showDriver && driver ? <DriverCard driver={driver} /> : null}
+        {showDriver && driver ? <DriverCard driver={driver} phone={live ? delivery.data?.driverPhone : null} /> : null}
 
         {delivery.data?.status === 'DELIVERED' && delivery.data.driverId ? (
           <RateDriverCard deliveryId={delivery.data.id} driverName={driver?.displayName} />

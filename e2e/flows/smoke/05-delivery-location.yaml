@@ -1,0 +1,53 @@
+url: ${APP_URL}
+name: Delivery location - the list shows only restaurants that deliver to the chosen location (#54)
+tags:
+  - smoke
+---
+# Signs in and picks the current location (QA Kitchen's street): the seeded kitchen is listed with its distance.
+- runFlow: ../_shared/login.yaml
+- assertVisible: 'Your current location'
+- extendedWaitUntil:
+    visible:
+      id: restaurant-QA Kitchen
+    timeout: 20000
+- assertVisible:
+    id: restaurant-QA Kitchen-distance
+
+# A pin far outside every delivery area (Alexandria): no restaurant, and the empty state says why.
+- tapOn:
+    id: delivery-location-change
+- extendedWaitUntil:
+    visible:
+      id: delivery-location-picker
+    timeout: 10000
+- tapOn:
+    id: location-latitude
+- eraseText: 20
+- inputText: '31.2001'
+- tapOn:
+    id: location-longitude
+- eraseText: 20
+- inputText: '29.9187'
+- tapOn:
+    id: location-confirm
+- extendedWaitUntil:
+    visible:
+      id: home-empty
+    timeout: 20000
+- assertVisible: 'No restaurants deliver here yet'
+- assertVisible: 'The pin you placed'
+- assertNotVisible:
+    id: restaurant-QA Kitchen
+
+# Back to the current location from the empty state.
+- tapOn: 'Change location'
+- extendedWaitUntil:
+    visible:
+      id: location-use-current
+    timeout: 10000
+- tapOn:
+    id: location-use-current
+- extendedWaitUntil:
+    visible:
+      id: restaurant-QA Kitchen
+    timeout: 20000

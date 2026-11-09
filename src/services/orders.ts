@@ -87,11 +87,22 @@ export function isActiveOrder(order: Pick<Order, 'status'>): boolean {
 /** Optional checkout details for POST /api/orders; without an address the order-service uses the profile address. */
 export type CreateOrderDetails = {
   deliveryNotes?: string;
+  /**
+   * #54: where to deliver. The backend needs the address text with the coordinates and checks the point
+   * against the restaurant's delivery area (409 OutOfDeliveryArea). Without them, the profile address is used.
+   */
+  delivery?: { address: string; latitude: number; longitude: number };
 };
 
 export async function createOrder(idempotencyKey?: string, details?: CreateOrderDetails): Promise<Order> {
   const notes = details?.deliveryNotes?.trim();
-  return apiPost<Order>('/api/orders', notes ? { deliveryNotes: notes } : {}, true, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
+  const body = {
+    ...(notes ? { deliveryNotes: notes } : {}),
+    ...(details?.delivery
+      ? { deliveryAddress: details.delivery.address, deliveryLatitude: details.delivery.latitude, deliveryLongitude: details.delivery.longitude }
+      : {}),
+  };
+  return apiPost<Order>('/api/orders', body, true, idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined);
 }
 
 export async function fetchMyOrders(): Promise<Order[]> {

@@ -147,6 +147,9 @@ tags:
     timeout: 15000
 - assertVisible:
     id: driver-card-vehicle
+# #54: while the delivery is active, the customer can call the driver (the number comes from the backend).
+- assertVisible:
+    id: driver-card-call
 - runScript:
     file: ../../scripts/control.js
     env:
@@ -306,6 +309,9 @@ tags:
 - assertVisible:
     id: order-phase
     text: Delivered
+# #54: the delivery is over, so there is no number to call.
+- assertNotVisible:
+    id: driver-card-call
 # Tracking ended with the delivery (ENDED): no card, no map, no driver position any more.
 - assertNotVisible:
     id: driver-location

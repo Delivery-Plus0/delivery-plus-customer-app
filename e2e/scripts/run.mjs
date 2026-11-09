@@ -47,6 +47,8 @@ const DRIVER_APP_DIR = resolve(process.env.DRIVER_APP_DIR ?? join(APP_DIR, '..',
 const DRIVER_WEB_PORT = Number(process.env.E2E_DRIVER_WEB_PORT ?? 8084);
 const DRIVER_APP_URL = `http://localhost:${DRIVER_WEB_PORT}`;
 const DRIVER_WEB_BUILD = join(E2E_DIR, '.driver-web-build');
+// #54: the customer's device location in E2E builds, on QA Kitchen's street.
+const CUSTOMER_FIXED_LOCATION = { latitude: 30.0444, longitude: 31.2357 };
 const DRIVER_FIXED_LOCATION = { latitude: 30.0444, longitude: 31.2357 };
 // A few streets further, for the realtime push check (tracking/move-driver).
 const DRIVER_MOVED_LOCATION = { latitude: 30.0478, longitude: 31.2402 };
@@ -60,7 +62,7 @@ const RESTAURANT_FLOWS = new Set(['business/customer-order-lifecycle.yaml']);
 const SKIP_CROSS_APP = process.env.E2E_SKIP_CROSS_APP === '1';
 
 const SUITES = {
-  smoke: ['smoke/01-login.yaml', 'smoke/02-browse.yaml', 'smoke/03-cart.yaml', 'smoke/04-checkout.yaml'],
+  smoke: ['smoke/01-login.yaml', 'smoke/02-browse.yaml', 'smoke/03-cart.yaml', 'smoke/04-checkout.yaml', 'smoke/05-delivery-location.yaml'],
   regression: [
     'regression/order-awaiting-driver.yaml',
     'regression/profile-photo.yaml',
@@ -563,7 +565,10 @@ async function main() {
   const crossApp = flows.some((flow) => CROSS_APP_FLOWS.has(flow));
   const withRestaurant = flows.some((flow) => RESTAURANT_FLOWS.has(flow));
 
-  if (flag('build') || !existsSync(join(WEB_BUILD, 'index.html'))) buildWeb();
+  // #54: the customer's "current location" is QA Kitchen's street, so the seeded restaurants deliver to it.
+  if (flag('build') || !existsSync(join(WEB_BUILD, 'index.html'))) {
+    buildWeb(APP_DIR, WEB_BUILD, { EXPO_PUBLIC_FIXED_LOCATION: `${CUSTOMER_FIXED_LOCATION.latitude},${CUSTOMER_FIXED_LOCATION.longitude}` });
+  }
   if (crossApp && (flag('build') || !existsSync(join(DRIVER_WEB_BUILD, 'index.html')))) buildDriverWeb();
   if (withRestaurant && (flag('build') || !existsSync(join(RESTAURANT_WEB_BUILD, 'index.html')))) buildRestaurantWeb();
   mkdirSync(ARTIFACTS, { recursive: true });

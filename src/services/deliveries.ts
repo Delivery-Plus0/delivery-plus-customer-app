@@ -24,6 +24,8 @@ export type Delivery = {
   updatedAt?: string;
   /** Present on the by-order read: the assigned driver's card, or null (none yet / unavailable). */
   driver?: DriverCard | null;
+  /** #54/#211: the driver's phone, for the order's customer only while the delivery is active; null otherwise. */
+  driverPhone?: string | null;
 };
 
 export const TERMINAL_DELIVERY_STATUSES: DeliveryStatus[] = ['DELIVERED', 'CANCELLED'];

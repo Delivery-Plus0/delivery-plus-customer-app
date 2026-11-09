@@ -52,6 +52,8 @@ describe('gateway route mappings', () => {
 
     expect(buildRestaurantQuery({ search: '  pizza ', status: 'OPEN' })).toBe('page=1&limit=20&status=OPEN&search=pizza');
     expect(buildRestaurantQuery({ search: '   ' })).toBe('page=1&limit=20');
+    // #54: a delivery location filters to the restaurants that deliver there.
+    expect(buildRestaurantQuery({ lat: 30.0444, lng: 31.2357, limit: 50 })).toBe('page=1&limit=50&lat=30.0444&lng=31.2357');
 
     await fetchRestaurants({ limit: 50 });
     expect(apiGet).toHaveBeenCalledWith('/api/restaurants?page=1&limit=50');

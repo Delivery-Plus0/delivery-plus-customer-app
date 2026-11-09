@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 
 import { CartBar } from '@/components/cart-bar';
+import { DeliveryLocationPicker } from '@/components/delivery-location-picker';
 import { FilterChip } from '@/components/filter-chip';
 import { RestaurantCard } from '@/components/restaurant-card';
 import { ThemedText } from '@/components/themed-text';
@@ -18,6 +19,8 @@ import { useAuthSession } from '@/services/session';
 import { cartItemCount, useCart } from '@/state/cart';
 import { useRestaurants } from '@/state/catalog';
 import { useProfile } from '@/state/profile';
+import { dismissLocationPicker, useDeliveryLocation } from '@/state/delivery-location';
+import { locationLabel, type DeliveryLocation } from '@/utils/delivery-location';
 import { firstName, greetingFor } from '@/utils/format';
 import { t } from '@/i18n';
 
@@ -32,8 +35,17 @@ export default function HomeScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [filter, setFilter] = useState<Filter>(FILTERS[0]);
   const debouncedSearch = useDebouncedValue(search);
+  // #54: the delivery location comes first; the list shows only restaurants that deliver there.
+  const { location, loaded, pickerRequested } = useDeliveryLocation();
+  const [changingFrom, setChangingFrom] = useState<DeliveryLocation | null | undefined>(undefined);
+  const showPicker = loaded && (!location || pickerRequested || (changingFrom !== undefined && changingFrom === location));
 
-  const restaurants = useRestaurants({ search: debouncedSearch, status: filter.status, limit: 50 });
+  const restaurants = useRestaurants({
+    search: debouncedSearch,
+    status: filter.status,
+    limit: 50,
+    ...(location ? { lat: location.latitude, lng: location.longitude } : {}),
+  });
   const { data: cart } = useCart();
   const { data: profile } = useProfile();
   const { session } = useAuthSession();
@@ -46,7 +58,21 @@ export default function HomeScreen() {
     router.push({ pathname: '/restaurant/[id]', params: { id: restaurant.id } });
   };
 
+  const changeLocation = () => setChangingFrom(location);
+  const cancelChange = () => {
+    setChangingFrom(undefined);
+    dismissLocationPicker();
+  };
+
   const renderBody = () => {
+    if (!loaded) return <SkeletonList count={3} itemHeight={120} />;
+    if (showPicker) {
+      return (
+        <View style={styles.pickerWrap}>
+          <DeliveryLocationPicker current={location} onCancel={location ? cancelChange : undefined} />
+        </View>
+      );
+    }
     if (restaurants.isLoading) return <SkeletonList count={3} itemHeight={120} />;
     if (restaurants.error && !restaurants.data) {
       return <ErrorState error={restaurants.error} onRetry={() => void restaurants.refresh()} />;
@@ -75,6 +101,29 @@ export default function HomeScreen() {
         />
       </View>
 
+      {location && !showPicker ? (
+        <Pressable
+          testID="delivery-location"
+          nativeID="delivery-location"
+          accessibilityRole="button"
+          accessibilityLabel={t('Delivering to {place}. Change the delivery location.', { place: locationLabel(location) })}
+          onPress={changeLocation}
+          style={styles.locationRow}
+        >
+          <Icon name="location" size={IconSize.sm} color={BrandColors.primaryText} />
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('Deliver to')}
+          </ThemedText>
+          <ThemedText type="smallBold" numberOfLines={1} style={styles.flexShrink} testID="delivery-location-label">
+            {locationLabel(location)}
+          </ThemedText>
+          <ThemedText type="linkPrimary" testID="delivery-location-change" nativeID="delivery-location-change">
+            {t('Change')}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
+      {showPicker ? null : (
       <View style={styles.searchWrap}>
         <View style={[styles.search, searchFocused && styles.searchFocused]}>
           <Icon name="search" size={IconSize.md} color={BrandColors.textMuted} />
@@ -113,6 +162,7 @@ export default function HomeScreen() {
           })}
         </View>
       </View>
+      )}
 
       {renderBody() ?? (
         <FlatList
@@ -144,21 +194,21 @@ export default function HomeScreen() {
           ListEmptyComponent={
             <StateView
               testID="home-empty"
-              icon={isSearching ? 'search' : 'store'}
-              actionLabel={isSearching ? t('Clear search') : undefined}
+              icon={isSearching ? 'search' : 'location'}
+              actionLabel={isSearching ? t('Clear search') : t('Change location')}
               onAction={
                 isSearching
                   ? () => {
                       setSearch('');
                       setFilter(FILTERS[0]);
                     }
-                  : undefined
+                  : changeLocation
               }
-              title={isSearching ? t('No matches') : t('No restaurants yet')}
+              title={isSearching ? t('No matches') : t('No restaurants deliver here yet')}
               message={
                 isSearching
                   ? t('Try a different name or clear the filters.')
-                  : t('Restaurants will show up here as soon as they join Delivery Plus.')
+                  : t('We are adding restaurants area by area. Try a delivery location closer to the city centre, or check back soon.')
               }
             />
           }
@@ -187,6 +237,20 @@ const styles = StyleSheet.create({
   },
   count: {
     paddingBottom: Spacing.two,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+  },
+  flexShrink: {
+    flexShrink: 1,
+  },
+  pickerWrap: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: 96,
   },
   searchWrap: {
     paddingHorizontal: Spacing.four,
