@@ -3,6 +3,9 @@ import { t } from '@/i18n/core';
 /** Where the customer wants the order delivered (#54): a point, and how it was chosen. */
 export type DeliveryLocation = { latitude: number; longitude: number; source: 'device' | 'map' };
 
+/** Latitude and longitude are numbers: keep them left-to-right inside an Arabic (RTL) form field (#78). */
+export const COORDINATE_INPUT_STYLE = { textAlign: 'left', writingDirection: 'ltr' } as const;
+
 /** A finite coordinate pair within range, or false. */
 export function isValidPoint(point: unknown): point is { latitude: number; longitude: number } {
   if (!point || typeof point !== 'object') return false;
