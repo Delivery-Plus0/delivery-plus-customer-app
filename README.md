@@ -23,13 +23,25 @@
 
 Built with **Expo 57 / React Native 0.86 / Expo Router / TypeScript**, and runs on Android, iOS and the web. The app talks only to the Delivery Plus API gateway. The backend (12 NestJS services, PostgreSQL, Redis, Kafka) lives in [Delivery-Plus0/delivery-plus](https://github.com/Delivery-Plus0/delivery-plus).
 
-## App gallery
+## Screens
 
-<p align="center">
-  <a href="./identity/mobile-screens.png"><img src="./identity/mobile-screens.png" alt="Four rounded phone mockups showing customer discovery, menu, checkout and live tracking" width="850"></a>
-</p>
+<!-- Generated from the app's web build (screens in docs/screens); regenerate rather than edit by hand. -->
+<table>
+<tr>
+<td align="center"><b>English</b></td>
+<td align="center"><b>العربية</b></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screens/tour-en.webp" width="260" alt="Every screen of the app in turn, in English"></td>
+<td align="center"><img src="docs/screens/tour-ar.webp" width="260" alt="كل شاشات التطبيق بالترتيب، بالعربية"></td>
+</tr>
+<tr>
+<td align="center"><a href="docs/screens/en/01-welcome.md">▶ Walk through, screen by screen</a></td>
+<td align="center"><a href="docs/screens/ar/01-welcome.md">▶ جولة شاشة بشاشة</a></td>
+</tr>
+</table>
 
-Four real screens from the running app, presented in rounded phone frames. Captured at phone width from the web build with seeded QA data.
+13 screens in a phone frame, in English and Arabic (right to left), from the web build with sample data. Each one has its own page with **Previous / Next**; all of them are in the [gallery](docs/screens/README.md). Photos: [Unsplash](https://unsplash.com/license).
 
 ## Features
 
