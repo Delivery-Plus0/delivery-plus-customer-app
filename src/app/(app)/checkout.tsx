@@ -168,7 +168,7 @@ export default function CheckoutScreen() {
   ) : (
     <AppButton
       testID="checkout-place-order"
-      title={quote.data ? t('Place order · {total}', { total: formatMoney(quote.data.totalAmount) }) : t('Place order')}
+      title={quote.data ? t('Place order · {total}', { total: formatMoney(quote.data.totalAmount, undefined, quote.data.currency) }) : t('Place order')}
       onPress={() => void handlePlaceOrder()}
       loading={placingOrder}
       disabled={!quote.data || Boolean(unavailable)}
@@ -298,7 +298,7 @@ export default function CheckoutScreen() {
                     {t('Subtotal')}
                   </ThemedText>
                   <ThemedText type="small" testID="checkout-subtotal" nativeID="checkout-subtotal">
-                    {formatMoney(quote.data.subtotalAmount)}
+                    {formatMoney(quote.data.subtotalAmount, undefined, quote.data.currency)}
                   </ThemedText>
                 </View>
                 <View style={styles.itemRow}>
@@ -306,13 +306,13 @@ export default function CheckoutScreen() {
                     {t('Delivery fee')}
                   </ThemedText>
                   <ThemedText type="small" testID="checkout-delivery-fee" nativeID="checkout-delivery-fee">
-                    {formatMoney(quote.data.deliveryFee)}
+                    {formatMoney(quote.data.deliveryFee, undefined, quote.data.currency)}
                   </ThemedText>
                 </View>
                 <View style={styles.itemRow}>
                   <ThemedText type="heading">{t('Total')}</ThemedText>
                   <ThemedText type="heading" testID="checkout-total" nativeID="checkout-total">
-                    {formatMoney(quote.data.totalAmount)}
+                    {formatMoney(quote.data.totalAmount, undefined, quote.data.currency)}
                   </ThemedText>
                 </View>
               </>
