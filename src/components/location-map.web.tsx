@@ -1,5 +1,4 @@
 import 'leaflet/dist/leaflet.css';
-import { parseFixedLocation } from '@/utils/delivery-location';
 
 import L from 'leaflet';
 import { useEffect, useRef } from 'react';
@@ -7,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { BrandColors, Radius } from '@/constants/theme';
 import { t } from '@/i18n';
+import { parseFixedLocation } from '@/utils/delivery-location';
 
 import type { LocationMapProps } from './location-map';
 
