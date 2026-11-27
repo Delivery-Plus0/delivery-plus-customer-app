@@ -26,6 +26,8 @@ export function notificationTitle(notification: Localizable): string {
       return t('Payment declined');
     case 'payment.refunded':
       return t('Refund issued');
+    case 'account.reactivated':
+      return t('Account reactivated');
     default:
       return notification.title;
   }
@@ -56,6 +58,9 @@ export function notificationMessage(notification: Localizable): string {
     case 'payment.refunded':
       // #56: the whole payment, items and delivery fee, back to the customer.
       return t('We refunded {amount} for your order {id}.', { id, amount: formatMoney(params.amount) });
+    case 'account.reactivated':
+      // Backend #215: staff lifted a suspension (the suspension itself sends no notice: the app is signed out).
+      return t('Your Delivery Plus account was reactivated. You can sign in again.');
     default:
       return notification.message;
   }

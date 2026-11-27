@@ -56,6 +56,8 @@ export const appArabic: Readonly<Record<string, string>> = {
   'Order cancelled': 'تم إلغاء الطلب',
   'Payment declined': 'تم رفض الدفع',
   'Refund issued': 'تم استرداد المبلغ',
+  'Account reactivated': 'تمت إعادة تفعيل الحساب',
+  'Your Delivery Plus account was reactivated. You can sign in again.': 'تمت إعادة تفعيل حسابك في ديليفري بلس. يمكنك تسجيل الدخول مرة أخرى.',
   'Your payment for order {id} was declined, so the order was not placed.': 'تم رفض الدفع للطلب {id}، لذلك لم يتم تقديم الطلب.',
   'We refunded {amount} for your order {id}.': 'رددنا لك {amount} عن طلبك {id}.',
   'Your order {id} has been confirmed.': 'تم تأكيد طلبك {id}.',
