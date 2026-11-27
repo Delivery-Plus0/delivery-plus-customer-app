@@ -27,6 +27,12 @@ describe('notification text (#151)', () => {
     expect(notificationMessage(refunded)).toBe('We refunded EGP\u00a0225.00 for your order ABCDEF12.');
   });
 
+  it('tells the customer their account was reactivated (backend #215)', () => {
+    const reactivated = { ...base, messageKey: 'account.reactivated', params: {} };
+    expect(notificationTitle(reactivated)).toBe('Account reactivated');
+    expect(notificationMessage(reactivated)).toBe('Your Delivery Plus account was reactivated. You can sign in again.');
+  });
+
   it('shows older notifications as stored', () => {
     expect(notificationTitle(base)).toBe('Order Confirmed');
     expect(notificationMessage({ ...base, messageKey: null })).toBe(base.message);
